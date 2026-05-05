@@ -87,45 +87,69 @@ def resize_image(image_bytes: bytes, max_size: int = 512) -> bytes:
     img.save(buf, format="JPEG", quality=85)
     return buf.getvalue()
 
-def call_huggingface_img2img(image_bytes: bytes, prompt: str) -> bytes:
-    """Редактирование фото через HuggingFace SDXL — высокое качество"""
-    token = os.environ.get("HUGGINGFACE_TOKEN", "")
-    if not token:
-        raise Exception("HUGGINGFACE_TOKEN не настроен")
+def call_openai_img2img(image_bytes: bytes, prompt: str) -> bytes:
+    """Редактирование фото через OpenAI gpt-image-1 (image edit API)"""
+    import io
+    from PIL import Image
 
-    image_bytes = resize_image(image_bytes, max_size=512)
-    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        raise Exception("OPENAI_API_KEY не настроен")
 
-    payload = json.dumps({
-        "inputs": prompt,
-        "parameters": {
-            "image": image_b64,
-            "strength": 0.6,
-            "guidance_scale": 7.5,
-            "num_inference_steps": 20,
-        }
-    }).encode()
+    # Конвертируем в PNG с прозрачностью (RGBA) — требование OpenAI
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+    png_buf = io.BytesIO()
+    img.save(png_buf, format="PNG")
+    png_bytes = png_buf.getvalue()
 
-    url = "https://api-inference.huggingface.co/models/timbrooks/instruct-pix2pix"
-    req = urllib.request.Request(url, data=payload, method="POST")
-    req.add_header("Authorization", f"Bearer {token}")
-    req.add_header("Content-Type", "application/json")
+    # Multipart form-data вручную
+    boundary = "----FormBoundary" + uuid.uuid4().hex
 
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            raw = resp.read()
-        # HuggingFace возвращает сырые байты изображения
-        if raw[:4] == b'\x89PNG' or raw[:2] == b'\xff\xd8':
-            print(f"[huggingface] got raw image: {len(raw)} bytes")
-            return raw
-        # Или JSON с ошибкой
-        result = json.loads(raw)
-        print(f"[huggingface] json response: {str(result)[:300]}")
-        raise Exception(f"HuggingFace вернул JSON: {str(result)[:200]}")
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[huggingface error] {e.code}: {err_body[:500]}")
-        raise Exception(f"HuggingFace error {e.code}: {err_body[:200]}")
+    def part(name, value, filename=None, content_type=None):
+        lines = []
+        disposition = f'Content-Disposition: form-data; name="{name}"'
+        if filename:
+            disposition += f'; filename="{filename}"'
+        lines.append(("--" + boundary).encode())
+        lines.append(disposition.encode())
+        if content_type:
+            lines.append(f"Content-Type: {content_type}".encode())
+        lines.append(b"")
+        if isinstance(value, str):
+            lines.append(value.encode())
+        else:
+            lines.append(value)
+        return b"\r\n".join(lines)
+
+    body_parts = [
+        part("model", "gpt-image-1"),
+        part("prompt", prompt),
+        part("image", png_bytes, filename="image.png", content_type="image/png"),
+        part("size", "1024x1024"),
+        part("n", "1"),
+        part("response_format", "b64_json"),
+    ]
+    body_data = b"\r\n" + b"\r\n".join(body_parts) + b"\r\n" + ("--" + boundary + "--").encode()
+
+    req = urllib.request.Request(
+        "https://api.openai.com/v1/images/edits",
+        data=body_data,
+        method="POST"
+    )
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        result = json.loads(resp.read())
+
+    print(f"[openai img2img] response keys: {list(result.keys())}")
+    b64_data = result["data"][0].get("b64_json") or result["data"][0].get("url")
+    if result["data"][0].get("b64_json"):
+        return base64.b64decode(b64_data)
+    else:
+        # Скачиваем по URL
+        with urllib.request.urlopen(b64_data, timeout=60) as r:
+            return r.read()
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
@@ -217,7 +241,7 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
 
         try:
-            result_bytes = call_huggingface_img2img(image_bytes, prompt)
+            result_bytes = call_openai_img2img(image_bytes, prompt)
             cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
         except Exception as e:
