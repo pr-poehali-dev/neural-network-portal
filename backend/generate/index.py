@@ -482,10 +482,181 @@ def handler(event: dict, context) -> dict:
     elif action == "presentation":
         topic = body.get("topic", "")
         slides_count = body.get("slides_count", 10)
-        system = "Ты — профессиональный презентационный дизайнер и копирайтер. Пиши на русском языке."
-        prompt = f"Создай структуру презентации из {slides_count} слайдов на тему: '{topic}'. Для каждого слайда: заголовок, ключевые тезисы (до 3), визуальное описание. Первый слайд — обложка."
-        result = generate_text_with_openrouter(prompt, system)
-        return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "presentation"})}
+        theme = body.get("theme", "dark")  # dark | light | corporate | creative | minimal
+
+        # 1. Генерируем структуру через OpenRouter
+        system = "Ты — профессиональный презентационный дизайнер. Отвечай ТОЛЬКО валидным JSON-массивом без markdown."
+        prompt = (
+            f"Создай структуру презентации из {slides_count} слайдов на тему: '{topic}'.\n"
+            f"Для каждого слайда верни объект:\n"
+            f'{{"slide": 1, "title": "...", "bullets": ["тезис1","тезис2","тезис3"], "image_query": "english search query for background image 5-7 words"}}\n'
+            f"Первый слайд — обложка (bullets = подзаголовок). Последний — выводы/контакты. Только JSON-массив."
+        )
+        raw = generate_text_with_openrouter(prompt, system)
+        slides_data = None
+        try:
+            clean = raw.strip()
+            if clean.startswith("```"):
+                parts = clean.split("```")
+                clean = parts[1] if len(parts) > 1 else clean
+                if clean.startswith("json"): clean = clean[4:]
+                clean = clean.strip()
+            slides_data = json.loads(clean)
+        except Exception:
+            slides_data = None
+
+        if not slides_data:
+            return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": raw, "type": "presentation"})}
+
+        # 2. Темы оформления
+        THEMES = {
+            "dark":      {"bg": (15, 15, 25),    "accent": (99, 102, 241),  "title": (255,255,255), "body": (180,180,200), "sub": (120,120,150)},
+            "light":     {"bg": (248, 249, 252),  "accent": (99, 102, 241),  "title": (20, 20, 40),  "body": (60, 60, 80),  "sub": (120,120,140)},
+            "corporate": {"bg": (10, 20, 50),     "accent": (0, 180, 216),   "title": (255,255,255), "body": (180,210,240), "sub": (100,140,180)},
+            "creative":  {"bg": (20, 10, 35),     "accent": (236, 72, 153),  "title": (255,255,255), "body": (220,180,240), "sub": (160,120,200)},
+            "minimal":   {"bg": (255, 255, 255),  "accent": (30, 30, 30),    "title": (10, 10, 10),  "body": (60, 60, 60),  "sub": (140,140,140)},
+        }
+        T = THEMES.get(theme, THEMES["dark"])
+
+        # 3. Строим PPTX
+        from pptx import Presentation as PPTXPresentation
+        from pptx.util import Inches, Pt, Emu
+        from pptx.dml.color import RGBColor
+        from pptx.enum.text import PP_ALIGN
+        import io as _io
+
+        prs = PPTXPresentation()
+        prs.slide_width  = Inches(13.33)
+        prs.slide_height = Inches(7.5)
+
+        def rgb(r,g,b): return RGBColor(r,g,b)
+        def add_rect(slide, l, t, w, h, fill_rgb, alpha=None):
+            shape = slide.shapes.add_shape(1, Inches(l), Inches(t), Inches(w), Inches(h))
+            shape.fill.solid()
+            shape.fill.fore_color.rgb = rgb(*fill_rgb)
+            shape.line.fill.background()
+            return shape
+
+        def add_text(slide, text, l, t, w, h, font_size, color_rgb, bold=False, align=PP_ALIGN.LEFT):
+            txBox = slide.shapes.add_textbox(Inches(l), Inches(t), Inches(w), Inches(h))
+            tf = txBox.text_frame
+            tf.word_wrap = True
+            p = tf.paragraphs[0]
+            p.alignment = align
+            run = p.add_run()
+            run.text = text
+            run.font.size = Pt(font_size)
+            run.font.color.rgb = rgb(*color_rgb)
+            run.font.bold = bold
+            return txBox
+
+        def fetch_image(query: str) -> bytes | None:
+            try:
+                import urllib.parse as _up
+                enc = _up.quote(query + " professional photography high quality")
+                url = f"https://image.pollinations.ai/prompt/{enc}?width=1920&height=1080&model=flux&nologo=true"
+                req2 = urllib.request.Request(url, method="GET")
+                req2.add_header("User-Agent", "Mozilla/5.0")
+                with urllib.request.urlopen(req2, timeout=30) as r:
+                    return r.read()
+            except Exception as ex:
+                print(f"[pptx img error] {ex}")
+                return None
+
+        for idx, slide_info in enumerate(slides_data):
+            slide_layout = prs.slide_layouts[6]  # blank
+            slide = prs.slides.add_slide(slide_layout)
+            title_text   = slide_info.get("title", f"Слайд {idx+1}")
+            bullets      = slide_info.get("bullets", [])
+            image_query  = slide_info.get("image_query", topic)
+            is_cover     = (idx == 0)
+
+            # Фон
+            add_rect(slide, 0, 0, 13.33, 7.5, T["bg"])
+
+            # Картинка
+            img_bytes = fetch_image(image_query)
+            if img_bytes:
+                try:
+                    from PIL import Image as PILImage
+                    pil = PILImage.open(_io.BytesIO(img_bytes)).convert("RGB")
+                    if is_cover:
+                        # Обложка — полная картинка с тёмным оверлеем
+                        pil = pil.resize((1920, 1080), PILImage.LANCZOS)
+                        buf = _io.BytesIO(); pil.save(buf, "PNG"); buf.seek(0)
+                        slide.shapes.add_picture(buf, Inches(0), Inches(0), Inches(13.33), Inches(7.5))
+                        # Тёмный оверлей
+                        overlay = slide.shapes.add_shape(1, Inches(0), Inches(0), Inches(13.33), Inches(7.5))
+                        overlay.fill.solid()
+                        overlay.fill.fore_color.rgb = rgb(0,0,0)
+                        overlay.fill.fore_color.theme_color = None
+                        from pptx.util import Pt as _Pt
+                        overlay.line.fill.background()
+                        # прозрачность через XML
+                        from lxml import etree
+                        sp_el = overlay.element
+                        sp_pr = sp_el.find('.//{http://schemas.openxmlformats.org/drawingml/2006/main}solidFill')
+                        if sp_pr is not None:
+                            srgb = sp_pr.find('{http://schemas.openxmlformats.org/drawingml/2006/main}srgbClr')
+                            if srgb is None:
+                                srgb = etree.SubElement(sp_pr, '{http://schemas.openxmlformats.org/drawingml/2006/main}srgbClr')
+                                srgb.set('val', '000000')
+                            alpha_el = etree.SubElement(srgb, '{http://schemas.openxmlformats.org/drawingml/2006/main}alpha')
+                            alpha_el.set('val', '60000')
+                    else:
+                        # Обычный слайд — картинка справа
+                        pil = pil.resize((760, 540), PILImage.LANCZOS)
+                        buf = _io.BytesIO(); pil.save(buf, "PNG"); buf.seek(0)
+                        slide.shapes.add_picture(buf, Inches(7.8), Inches(0.8), Inches(5.0), Inches(5.9))
+                        # Акцентная полоска слева
+                        add_rect(slide, 0, 0, 0.08, 7.5, T["accent"])
+                except Exception as ex:
+                    print(f"[pptx img render error] {ex}")
+
+            if is_cover:
+                # Номер слайда / надпись сверху
+                add_text(slide, topic.upper(), 1.0, 1.2, 11.0, 0.5, 11, T["sub"], align=PP_ALIGN.CENTER)
+                # Большой заголовок
+                add_text(slide, title_text, 0.8, 2.2, 11.7, 2.0, 44, T["title"], bold=True, align=PP_ALIGN.CENTER)
+                # Подзаголовок
+                if bullets:
+                    add_text(slide, bullets[0] if isinstance(bullets, list) else str(bullets), 1.0, 4.4, 11.3, 0.8, 20, T["body"], align=PP_ALIGN.CENTER)
+                # Акцентная линия
+                add_rect(slide, 5.0, 4.1, 3.33, 0.06, T["accent"])
+            else:
+                # Заголовок
+                add_text(slide, title_text, 0.4, 0.3, 7.0, 1.0, 28, T["title"], bold=True)
+                # Акцентная линия под заголовком
+                add_rect(slide, 0.4, 1.35, 2.5, 0.05, T["accent"])
+                # Буллеты
+                y = 1.6
+                for bullet in (bullets if isinstance(bullets, list) else []):
+                    bullet_str = f"• {bullet}"
+                    add_text(slide, bullet_str, 0.55, y, 6.9, 0.75, 16, T["body"])
+                    y += 0.85
+                # Номер слайда
+                add_text(slide, str(idx + 1), 12.5, 6.9, 0.5, 0.4, 11, T["sub"], align=PP_ALIGN.RIGHT)
+
+        # 4. Сохраняем и загружаем в S3
+        buf = _io.BytesIO()
+        prs.save(buf)
+        pptx_bytes = buf.getvalue()
+        cdn_url = upload_image_to_s3(pptx_bytes, prefix="presentations")
+        # Меняем расширение в URL
+        cdn_url = cdn_url.replace(".png", ".pptx")
+        # Загружаем с правильным типом
+        s3 = get_s3()
+        key = f"images/presentations/{uuid.uuid4()}.pptx"
+        s3.put_object(Bucket="files", Key=key, Body=pptx_bytes, ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation")
+        access_key = os.environ["AWS_ACCESS_KEY_ID"]
+        cdn_url = f"https://cdn.poehali.dev/projects/{access_key}/bucket/{key}"
+
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({
+            "result": raw,
+            "pptx_url": cdn_url,
+            "slides_count": len(slides_data),
+            "type": "presentation"
+        })}
 
     elif action == "guide":
         topic = body.get("topic", "")
