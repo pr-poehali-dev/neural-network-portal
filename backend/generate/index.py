@@ -74,52 +74,43 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
-def call_stability_img2img(image_bytes: bytes, prompt: str, size: str = "square") -> bytes:
-    api_key = os.environ.get("STABILITY_API_KEY", "")
+def call_gemini_img2img(image_bytes: bytes, prompt: str) -> bytes:
+    api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
-        raise Exception("STABILITY_API_KEY не настроен")
+        raise Exception("GEMINI_API_KEY не настроен")
 
-    boundary = "----FormBoundary" + uuid.uuid4().hex
+    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
-    def field(name, value):
-        return (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
-            f"{value}\r\n"
-        ).encode()
+    payload = json.dumps({
+        "contents": [{
+            "parts": [
+                {"text": prompt},
+                {"inline_data": {"mime_type": "image/png", "data": image_b64}}
+            ]
+        }],
+        "generationConfig": {
+            "responseModalities": ["IMAGE", "TEXT"]
+        }
+    }).encode()
 
-    def file_field(name, filename, content_type, data):
-        return (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'
-            f"Content-Type: {content_type}\r\n\r\n"
-        ).encode() + data + b"\r\n"
-
-    body = (
-        field("prompt", prompt) +
-        field("mode", "image-to-image") +
-        field("model", "sd3-large-turbo") +
-        field("strength", "0.7") +
-        field("output_format", "png") +
-        file_field("image", "image.png", "image/png", image_bytes) +
-        f"--{boundary}--\r\n".encode()
-    )
-
-    req = urllib.request.Request(
-        "https://api.stability.ai/v2beta/stable-image/generate/sd3",
-        data=body, method="POST"
-    )
-    req.add_header("Authorization", f"Bearer {api_key}")
-    req.add_header("Accept", "image/*")
-    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key={api_key}"
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Content-Type", "application/json")
 
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
-            return resp.read()
+            result = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[stability error] {e.code}: {err_body}")
-        raise Exception(f"Stability AI error {e.code}: {err_body}")
+        print(f"[gemini error] {e.code}: {err_body}")
+        raise Exception(f"Gemini error {e.code}: {err_body}")
+
+    parts = result["candidates"][0]["content"]["parts"]
+    for part in parts:
+        if "inlineData" in part:
+            return base64.b64decode(part["inlineData"]["data"])
+
+    raise Exception("Gemini не вернул изображение")
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
@@ -211,7 +202,7 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
 
         try:
-            result_bytes = call_stability_img2img(image_bytes, prompt, size)
+            result_bytes = call_gemini_img2img(image_bytes, prompt)
             cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
         except Exception as e:
