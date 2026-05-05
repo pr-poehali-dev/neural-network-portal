@@ -262,10 +262,37 @@ def handler(event: dict, context) -> dict:
         niche = body.get("niche", "")
         period = body.get("period", "месяц")
         goals = body.get("goals", "рост подписчиков")
-        system = "Ты — стратег контент-маркетинга. Пиши на русском языке. Отвечай в формате структурированной таблицы."
-        prompt = f"Создай контент-план на {period} для ниши '{niche}'. Цели: {goals}. Формат: таблица с колонками: дата, тема, формат, платформа, хэштеги, примечания. Минимум 20 записей."
-        result = generate_text_with_openrouter(prompt, system)
-        return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "content_plan"})}
+        system = (
+            "Ты — стратег контент-маркетинга. Отвечай ТОЛЬКО валидным JSON-массивом без лишнего текста. "
+            "Каждый элемент массива — объект с полями: "
+            "date (строка, например '01.06'), topic (тема поста), format (Reels/Карусель/Пост/Сторис), "
+            "platform (Instagram/VK/Telegram), hashtags (3-5 хэштегов через пробел), notes (краткая заметка)."
+        )
+        prompt = (
+            f"Создай контент-план на {period} для ниши '{niche}'. Цели: {goals}. "
+            f"Верни JSON-массив минимум из 20 объектов. Только JSON, без markdown и пояснений."
+        )
+        raw_result = generate_text_with_openrouter(prompt, system)
+
+        # Пробуем распарсить JSON из ответа
+        rows = None
+        try:
+            # Убираем возможные ```json ... ``` обёртки
+            clean = raw_result.strip()
+            if clean.startswith("```"):
+                clean = clean.split("```")[1]
+                if clean.startswith("json"):
+                    clean = clean[4:]
+                clean = clean.strip()
+            rows = json.loads(clean)
+        except Exception:
+            rows = None
+
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({
+            "result": raw_result,
+            "rows": rows,
+            "type": "content_plan"
+        })}
 
     elif action == "carousel":
         topic = body.get("topic", "")

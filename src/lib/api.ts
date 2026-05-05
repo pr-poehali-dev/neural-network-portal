@@ -127,7 +127,7 @@ export const generateApi = {
     }),
 
   contentPlan: (niche: string, period: string, goals: string) =>
-    request<{ result: string; type: string }>(GENERATE_URL, {
+    request<{ result: string; rows: ContentPlanRow[] | null; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({ action: "content-plan", niche, period, goals }),
@@ -292,6 +292,15 @@ export interface AiTool {
   is_featured: boolean;
   tags: string[];
   capabilities: string[];
+}
+
+export interface ContentPlanRow {
+  date: string;
+  topic: string;
+  format: string;
+  platform: string;
+  hashtags: string;
+  notes: string;
 }
 
 export interface Generation {
