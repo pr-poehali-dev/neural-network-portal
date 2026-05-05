@@ -143,10 +143,10 @@ def call_cloudflare_img2img(image_bytes: bytes, prompt: str) -> bytes:
         raise Exception(f"Cloudflare вернул нераспознанный формат: {len(raw)} bytes")
 
 def gemini_generate_slides(topic: str, slides_count: int, ai_text: bool) -> list:
-    """Генерирует структуру слайдов карусели через Gemini"""
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+    """Генерирует структуру слайдов карусели через OpenRouter (gpt-4o-mini)"""
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
     if not api_key:
-        raise Exception("GEMINI_API_KEY не настроен")
+        raise Exception("OPENROUTER_API_KEY не настроен")
 
     text_instruction = (
         "Для каждого слайда придумай яркий заголовок И полный готовый текст для слайда (2-4 строки, конкретно и ёмко)."
@@ -162,19 +162,24 @@ def gemini_generate_slides(topic: str, slides_count: int, ai_text: bool) -> list
         f"Первый слайд — цепляющий крючок. Последний — призыв к действию."
     )
     payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"temperature": 0.8, "maxOutputTokens": 4000}
+        "model": "openai/gpt-4o-mini",
+        "messages": [
+            {"role": "system", "content": "Ты — создатель вирусного контента для Instagram. Отвечай ТОЛЬКО валидным JSON-массивом без пояснений и markdown."},
+            {"role": "user", "content": prompt}
+        ],
+        "max_tokens": 4000
     }).encode()
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
-    req = urllib.request.Request(url, data=payload, method="POST")
+    req = urllib.request.Request("https://openrouter.ai/api/v1/chat/completions", data=payload, method="POST")
     req.add_header("Content-Type", "application/json")
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("HTTP-Referer", "https://neuralai.poehali.dev")
     try:
         with urllib.request.urlopen(req, timeout=60) as resp:
             data = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", errors="ignore")
-        raise Exception(f"Gemini error {e.code}: {err[:300]}")
-    raw = data["candidates"][0]["content"]["parts"][0]["text"]
+        raise Exception(f"OpenRouter error {e.code}: {err[:300]}")
+    raw = data["choices"][0]["message"]["content"]
     clean = raw.strip()
     if clean.startswith("```"):
         parts = clean.split("```")
