@@ -162,7 +162,16 @@ def handler(event: dict, context) -> dict:
                 return {"statusCode": 200, "headers": headers, "body": json.dumps({"ok": True})}
 
             yookassa_payment_id = payment_obj.get("id", "")
-            metadata = payment_obj.get("metadata", {})
+
+            # Верифицируем платёж напрямую через ЮКассу
+            try:
+                verified = yookassa_request("GET", f"payments/{yookassa_payment_id}")
+                if verified.get("status") != "succeeded":
+                    return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Платёж не подтверждён"})}
+                payment_obj = verified
+                metadata = verified.get("metadata", {})
+            except Exception:
+                return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Ошибка проверки платежа"})}
 
             user_id = int(metadata.get("user_id", 0))
             plan_id = int(metadata.get("plan_id", 0))

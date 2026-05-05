@@ -112,12 +112,12 @@ def handler(event: dict, context) -> dict:
                 slug, is_unlimited, gen_per_tool, is_single_tool, single_slug, expires_at, granted_by_admin = sub
                 if is_unlimited:
                     if is_single_tool and single_slug and single_slug != tool_slug:
-                        pass
+                        return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": False, "reason": "wrong_tool"})}
                     else:
                         return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": True, "reason": "subscription_unlimited"})}
                 else:
                     if is_single_tool and single_slug and single_slug != tool_slug:
-                        pass
+                        return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": False, "reason": "wrong_tool"})}
                     else:
                         used = count_generations(cur, user_id, tool_slug)
                         if used < gen_per_tool:
