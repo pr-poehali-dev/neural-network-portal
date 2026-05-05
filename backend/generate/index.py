@@ -106,7 +106,7 @@ def call_huggingface_img2img(image_bytes: bytes, prompt: str) -> bytes:
         }
     }).encode()
 
-    url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-refiner-1.0"
+    url = "https://api-inference.huggingface.co/models/timbrooks/instruct-pix2pix"
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Authorization", f"Bearer {token}")
     req.add_header("Content-Type", "application/json")
