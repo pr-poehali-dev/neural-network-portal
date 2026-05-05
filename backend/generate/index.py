@@ -74,79 +74,65 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
-def call_gemini_img2img(image_bytes: bytes, prompt: str) -> bytes:
-    """Редактирование изображения через Google Imagen 3 (edit)"""
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+def call_openai_img2img(image_bytes: bytes, prompt: str) -> bytes:
+    """Редактирование изображения через OpenAI gpt-image-1"""
+    import io, struct, zlib
+
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
     if not api_key:
-        raise Exception("GEMINI_API_KEY не настроен")
+        raise Exception("OPENROUTER_API_KEY не настроен")
 
-    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+    # Конвертируем в PNG если нужно — делаем через raw bytes
+    # Строим multipart вручную
+    boundary = "----Boundary" + uuid.uuid4().hex
 
-    payload = json.dumps({
-        "instances": [{
-            "prompt": prompt,
-            "referenceImages": [{
-                "referenceType": "REFERENCE_TYPE_RAW",
-                "referenceId": 1,
-                "referenceImage": {
-                    "bytesBase64Encoded": image_b64,
-                    "mimeType": "image/png"
-                }
-            }]
-        }],
-        "parameters": {
-            "editMode": "EDIT_MODE_DEFAULT",
-            "editConfig": {"baseSteps": 75},
-            "sampleCount": 1,
-            "outputOptions": {"mimeType": "image/png"}
-        }
-    }).encode()
+    def field(name, value):
+        return (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+            f"{value}\r\n"
+        ).encode()
 
-    url = f"https://us-central1-aiplatform.googleapis.com/v1/projects/generativelanguage/locations/us-central1/publishers/google/models/imagen-3.0-capability-preview-0930:predict?key={api_key}"
-    req = urllib.request.Request(url, data=payload, method="POST")
-    req.add_header("Content-Type", "application/json")
+    def file_field(name, filename, content_type, data):
+        return (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'
+            f"Content-Type: {content_type}\r\n\r\n"
+        ).encode() + data + b"\r\n"
+
+    body = (
+        field("model", "openai/gpt-image-1") +
+        field("prompt", prompt) +
+        field("n", "1") +
+        field("size", "1024x1024") +
+        file_field("image[]", "image.png", "image/png", image_bytes) +
+        f"--{boundary}--\r\n".encode()
+    )
+
+    req = urllib.request.Request(
+        "https://openrouter.ai/api/v1/images/edits",
+        data=body, method="POST"
+    )
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
 
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
             result = json.loads(resp.read())
-        print(f"[imagen] response keys: {list(result.keys())}")
-        predictions = result.get("predictions", [])
-        if predictions and "bytesBase64Encoded" in predictions[0]:
-            return base64.b64decode(predictions[0]["bytesBase64Encoded"])
-        raise Exception(f"Imagen не вернул изображение: {str(result)[:300]}")
+        print(f"[openai img2img] response: {str(result)[:200]}")
+        data_list = result.get("data", [])
+        if data_list:
+            item = data_list[0]
+            if "b64_json" in item:
+                return base64.b64decode(item["b64_json"])
+            if "url" in item:
+                with urllib.request.urlopen(item["url"], timeout=60) as r:
+                    return r.read()
+        raise Exception(f"Нет изображения в ответе: {str(result)[:300]}")
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[imagen error] {e.code}: {err_body[:500]}")
-
-    # Fallback: Gemini 2.0 Flash через OpenAI-совместимый endpoint
-    print("[gemini] trying fallback via Gemini API image generation...")
-    payload2 = json.dumps({
-        "model": "gemini-2.0-flash-preview-image-generation",
-        "contents": [{
-            "parts": [
-                {"text": f"Edit this image: {prompt}"},
-                {"inline_data": {"mime_type": "image/png", "data": image_b64}}
-            ]
-        }],
-        "generationConfig": {"responseModalities": ["IMAGE"]}
-    }).encode()
-
-    url2 = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key={api_key}"
-    req2 = urllib.request.Request(url2, data=payload2, method="POST")
-    req2.add_header("Content-Type", "application/json")
-
-    try:
-        with urllib.request.urlopen(req2, timeout=120) as resp:
-            result2 = json.loads(resp.read())
-        parts = result2["candidates"][0]["content"]["parts"]
-        for part in parts:
-            if "inlineData" in part:
-                return base64.b64decode(part["inlineData"]["data"])
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[gemini fallback error] {e.code}: {err_body[:500]}")
-
-    raise Exception("Gemini не смог отредактировать изображение. Попробуй другое фото или формулировку.")
+        print(f"[openai img2img error] {e.code}: {err_body[:500]}")
+        raise Exception(f"Ошибка редактирования: {err_body[:300]}")
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
@@ -238,7 +224,7 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
 
         try:
-            result_bytes = call_gemini_img2img(image_bytes, prompt)
+            result_bytes = call_openai_img2img(image_bytes, prompt)
             cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
         except Exception as e:
