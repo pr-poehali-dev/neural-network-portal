@@ -42,6 +42,9 @@ import CaseTool from "./pages/tools/CaseTool";
 import Dashboard from "./pages/Dashboard";
 import Prompts from "./pages/Prompts";
 import AIAssistant from "./components/AIAssistant";
+import NamingTool from "./pages/tools/NamingTool";
+import AdCopyTool from "./pages/tools/AdCopyTool";
+import CommentTool from "./pages/tools/CommentTool";
 
 const queryClient = new QueryClient();
 
@@ -88,6 +91,9 @@ function AppRoutes() {
           <Route path="/tools/case" element={<CaseTool />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/prompts" element={<Prompts />} />
+          <Route path="/tools/naming" element={<NamingTool />} />
+          <Route path="/tools/ad-copy" element={<AdCopyTool />} />
+          <Route path="/tools/comments" element={<CommentTool />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

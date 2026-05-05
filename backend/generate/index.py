@@ -566,6 +566,78 @@ def handler(event: dict, context) -> dict:
             "actions": actions if actions else None
         })}
 
+    elif action == "naming":
+        business_type = body.get("business_type", "")
+        niche = body.get("niche", "")
+        style = body.get("style", "Дружелюбный")
+        target_audience = body.get("target_audience", "")
+        with_slogan = body.get("with_slogan", True)
+        if not business_type:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите тип бизнеса"})}
+        slogan_part = "и слоган (1 предложение)" if with_slogan else ""
+        system = "Ты — брендинг-эксперт и копирайтер. Отвечай ТОЛЬКО валидным JSON-массивом без markdown."
+        prompt = (
+            f"Придумай 6 вариантов названия {slogan_part} и краткое описание для:\n"
+            f"Бизнес: {business_type}\nНиша: {niche}\nАудитория: {target_audience}\nСтиль: {style}\n\n"
+            f"Верни JSON-массив: [{{\"name\": \"...\", \"slogan\": \"...\", \"description\": \"почему это название работает\"}}]\n"
+            f"Названия должны быть оригинальными, запоминающимися, подходящими для домена и соцсетей."
+        )
+        result = generate_text_with_openrouter(prompt, system)
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "naming"})}
+
+    elif action == "ad-copy":
+        product = body.get("product", "")
+        audience = body.get("audience", "")
+        platform = body.get("platform", "Яндекс.Директ")
+        goal = body.get("goal", "Продажи")
+        budget = body.get("budget", "")
+        if not product:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите продукт"})}
+        budget_str = f"Бюджет: {budget}." if budget else ""
+        system = "Ты — эксперт по контекстной и таргетированной рекламе. Отвечай ТОЛЬКО валидным JSON-массивом без markdown."
+        prompt = (
+            f"Создай 4 рекламных объявления для {platform}.\n"
+            f"Продукт: {product}\nАудитория: {audience}\nЦель: {goal}\n{budget_str}\n\n"
+            f"Учти ограничения {platform}: для Яндекс.Директ заголовок до 56 символов, текст до 81 символа.\n"
+            f"Верни JSON-массив: [{{\"title\": \"...\", \"text\": \"...\", \"cta\": \"Кнопка призыва\", \"tip\": \"Совет по этому объявлению\"}}]\n"
+            f"Каждое объявление должно быть цепляющим и релевантным аудитории."
+        )
+        result = generate_text_with_openrouter(prompt, system)
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "ad-copy"})}
+
+    elif action == "comments":
+        post_topic = body.get("post_topic", "")
+        account_niche = body.get("account_niche", "")
+        comment_style = body.get("comment_style", "Вопрос")
+        count = body.get("count", 10)
+        if not post_topic:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите тему поста"})}
+        system = "Ты — эксперт по продвижению в соцсетях. Отвечай ТОЛЬКО валидным JSON-массивом без markdown."
+        prompt = (
+            f"Придумай {count} естественных комментариев для прогрева под пост на тему: '{post_topic}'.\n"
+            f"Ниша аккаунта: {account_niche}\nСтиль: {comment_style}\n\n"
+            f"Комментарии должны быть разными по длине (от 5 до 30 слов), живыми, без рекламы.\n"
+            f"Верни JSON-массив строк: [\"комментарий 1\", \"комментарий 2\", ...]"
+        )
+        result = generate_text_with_openrouter(prompt, system)
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "comments"})}
+
+    elif action == "scenario-convert":
+        source_text = body.get("source_text", "")
+        platform = body.get("platform", "Reels")
+        duration = body.get("duration", "60 секунд")
+        if not source_text:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Вставьте текст для конвертации"})}
+        system = "Ты — профессиональный сценарист видео-контента. Пиши на русском языке."
+        prompt = (
+            f"Конвертируй этот текст в видео-сценарий для {platform}, длительность {duration}:\n\n{source_text}\n\n"
+            f"Адаптируй под видео-формат: добавь крючок в начало, разбей на сцены с таймкодами, "
+            f"сделай динамичный монтаж, добавь призыв к действию в конце. "
+            f"Укажи: [0:00] Крючок, [0:05] Основная часть (по сценам), [конец] CTA, советы по съёмке."
+        )
+        result = generate_text_with_openrouter(prompt, system)
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "scenario"})}
+
     elif action == "sale-script":
         product = body.get("product", "")
         audience = body.get("audience", "")

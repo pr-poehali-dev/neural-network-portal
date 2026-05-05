@@ -272,6 +272,24 @@ export const generateApi = {
       headers: authHeaders(),
       body: JSON.stringify({ action: "ai-assistant", message, history }),
     }, 30000),
+
+  scenarioConvert: (text: string, platform: string, duration: string) =>
+    request<{ result: string; type: string }>(GENERATE_URL, {
+      method: "POST", headers: authHeaders(),
+      body: JSON.stringify({ action: "scenario-convert", source_text: text, platform, duration }),
+    }, 45000),
+
+  naming: (businessType: string, niche: string, style: string, targetAudience: string, withSlogan: boolean) =>
+    request<{ result: string }>(GENERATE_URL, { method: "POST", headers: authHeaders(),
+    body: JSON.stringify({ action: "naming", business_type: businessType, niche, style, target_audience: targetAudience, with_slogan: withSlogan }) }, 30000),
+
+  adCopy: (product: string, audience: string, platform: string, goal: string, budget: string) =>
+    request<{ result: string }>(GENERATE_URL, { method: "POST", headers: authHeaders(),
+    body: JSON.stringify({ action: "ad-copy", product, audience, platform, goal, budget }) }, 30000),
+
+  comments: (postTopic: string, accountNiche: string, commentStyle: string, count: number) =>
+    request<{ result: string }>(GENERATE_URL, { method: "POST", headers: authHeaders(),
+    body: JSON.stringify({ action: "comments", post_topic: postTopic, account_niche: accountNiche, comment_style: commentStyle, count }) }, 30000),
 };
 
 export const paymentsApi = {

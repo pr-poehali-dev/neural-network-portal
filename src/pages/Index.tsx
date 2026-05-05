@@ -22,10 +22,23 @@ const TOOLS = [
 ];
 
 const STATS = [
-  { value: "12+", label: "ИИ-инструментов" },
+  { value: "22+", label: "ИИ-инструментов" },
   { value: "100%", label: "На русском языке" },
   { value: "1 клик", label: "До результата" },
   { value: "∞", label: "Идей для контента" },
+];
+
+const DAILY_TIPS = [
+  "Публикуй Reels в 18:00–20:00 — пиковое время для охватов",
+  "Используй 3–5 хэштегов в первом комментарии, а не в подписи",
+  "Карусели получают в 3 раза больше охватов чем обычные посты",
+  "Первые 3 секунды Reels определяют 80% просмотров — делай яркий крючок",
+  "Сторис каждый день повышают охват постов на 40%",
+  "Задавай вопрос в конце поста — комментарии поднимают пост в ленте",
+  "Фото с лицом человека получают на 35% больше лайков",
+  "Отвечай на комментарии в первый час после публикации",
+  "Публикуй контент-план на неделю вперёд — алгоритмы любят регулярность",
+  "Коллаборации с авторами из смежных ниш дают самый быстрый прирост",
 ];
 
 const DIANA_USER = {
@@ -36,6 +49,7 @@ const DIANA_USER = {
 export default function Index() {
   const [authOpen, setAuthOpen] = useState(false);
   const { user } = useAuth();
+  const tip = DAILY_TIPS[new Date().getDay() * 3 % 10];
 
   const quickLogin = () => {
     localStorage.setItem("auth_token", "mytoken123");
@@ -63,12 +77,12 @@ export default function Index() {
           </h1>
 
           <p className="text-lg md:text-xl text-white/50 mb-10 max-w-2xl mx-auto animate-slide-up stagger-2 leading-relaxed">
-            12 ИИ-инструментов для Instagram, TikTok и маркетплейсов. Карусели, сценарии, контент-планы, изображения и многое другое — всё на русском языке.
+            22 ИИ-инструмента для Instagram, TikTok и маркетплейсов. Карусели, сценарии, контент-планы, изображения и многое другое — всё на русском языке.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-slide-up stagger-3">
             {user ? (
-              <Link to="/tools">
+              <Link to="/dashboard">
                 <Button size="lg" className="bg-primary text-black font-semibold text-base px-8 hover:bg-primary/90 h-12">
                   Открыть инструменты
                   <Icon name="ArrowRight" size={18} className="ml-2" />
@@ -105,6 +119,20 @@ export default function Index() {
               <div className="text-sm text-white/40">{s.label}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="py-8 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="glass rounded-xl p-5 border border-primary/15 bg-primary/5 flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <Icon name="Lightbulb" size={20} className="text-primary" />
+            </div>
+            <div>
+              <p className="text-xs text-primary/70 font-medium mb-1">СОВЕТ ДНЯ</p>
+              <p className="text-white/80 text-sm leading-relaxed">{tip}</p>
+            </div>
+          </div>
         </div>
       </section>
 

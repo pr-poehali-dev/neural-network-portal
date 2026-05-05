@@ -184,6 +184,30 @@ const TOOLS = [
     color: "from-yellow-500/20 to-amber-500/20 border-yellow-500/20",
     hint: "Опиши результат клиента — получи кейс",
   },
+  {
+    icon: "Sparkles",
+    label: "Названия и слоганы",
+    desc: "6 вариантов названия бренда, продукта или аккаунта со слоганами",
+    href: "/tools/naming",
+    color: "from-fuchsia-500/20 to-violet-500/20 border-fuchsia-500/20",
+    hint: "Тип бизнеса + стиль = готовые названия",
+  },
+  {
+    icon: "Megaphone",
+    label: "Рекламные объявления",
+    desc: "Объявления для Яндекс.Директ, VK Рекламы, Telegram Ads",
+    href: "/tools/ad-copy",
+    color: "from-rose-500/20 to-red-500/20 border-rose-500/20",
+    hint: "Продукт + платформа = готовые объявления",
+  },
+  {
+    icon: "MessageCircle",
+    label: "Комментарии для прогрева",
+    desc: "Живые комментарии разных стилей для повышения активности",
+    href: "/tools/comments",
+    color: "from-teal-500/20 to-green-500/20 border-teal-500/20",
+    hint: "Тема поста + стиль = набор комментариев",
+  },
 ];
 
 export default function Tools() {
