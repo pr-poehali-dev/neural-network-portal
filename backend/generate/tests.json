@@ -1,10 +1,20 @@
 {
   "tests": [
     {
-      "name": "Get photo roulette prompt",
+      "name": "Test roulette GET",
       "method": "GET",
       "path": "/",
-      "expectedStatus": 405,
+      "expectedStatus": 200,
+      "expectedBody": {"prompt": "string"},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Test post generation",
+      "method": "POST",
+      "path": "/",
+      "body": {"action": "post", "topic": "утренняя рутина", "platform": "Instagram", "tone": "вовлекающий"},
+      "expectedStatus": 200,
+      "expectedBody": {"type": "post"},
       "bodyMatcher": "partial"
     }
   ]

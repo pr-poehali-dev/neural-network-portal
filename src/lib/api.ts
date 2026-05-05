@@ -94,90 +94,90 @@ export const toolsApi = {
 
 export const generateApi = {
   roulette: () =>
-    request<{ prompt: string }>(`${GENERATE_URL}/roulette`, { headers: authHeaders() }),
+    request<{ prompt: string }>(GENERATE_URL, { headers: authHeaders() }),
 
   imageGen: (prompt: string, style: string) =>
-    request<{ image_url: string; prompt: string }>(`${GENERATE_URL}/image-gen`, {
+    request<{ image_url: string; prompt: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ prompt, style }),
+      body: JSON.stringify({ action: "image-gen", prompt, style }),
     }),
 
   imageEdit: (image_base64: string, prompt: string) =>
-    request<{ image_url: string; prompt: string }>(`${GENERATE_URL}/image-edit`, {
+    request<{ image_url: string; prompt: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ image_base64, prompt }),
+      body: JSON.stringify({ action: "image-edit", image_base64, prompt }),
     }),
 
   post: (topic: string, platform: string, tone: string) =>
-    request<{ result: string; type: string }>(`${GENERATE_URL}/post`, {
+    request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ topic, platform, tone }),
+      body: JSON.stringify({ action: "post", topic, platform, tone }),
     }),
 
   scenario: (topic: string, platform: string, duration: string) =>
-    request<{ result: string; type: string }>(`${GENERATE_URL}/scenario`, {
+    request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ topic, platform, duration }),
+      body: JSON.stringify({ action: "scenario", topic, platform, duration }),
     }),
 
   contentPlan: (niche: string, period: string, goals: string) =>
-    request<{ result: string; type: string }>(`${GENERATE_URL}/content-plan`, {
+    request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ niche, period, goals }),
+      body: JSON.stringify({ action: "content-plan", niche, period, goals }),
     }),
 
   carousel: (topic: string, slides_count: number) =>
-    request<{ result: string; type: string }>(`${GENERATE_URL}/carousel`, {
+    request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ topic, slides_count }),
+      body: JSON.stringify({ action: "carousel", topic, slides_count }),
     }),
 
   profileAnalysis: (niche: string, followers: number, avg_likes: number) =>
-    request<{ result: string; type: string }>(`${GENERATE_URL}/profile-analysis`, {
+    request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ niche, followers, avg_likes }),
+      body: JSON.stringify({ action: "profile-analysis", niche, followers, avg_likes }),
     }),
 
   funnel: (platform: string, product: string, audience: string) =>
-    request<{ result: string; type: string }>(`${GENERATE_URL}/funnel`, {
+    request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ platform, product, audience }),
+      body: JSON.stringify({ action: "funnel", platform, product, audience }),
     }),
 
   presentation: (topic: string, slides_count: number) =>
-    request<{ result: string; type: string }>(`${GENERATE_URL}/presentation`, {
+    request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ topic, slides_count }),
+      body: JSON.stringify({ action: "presentation", topic, slides_count }),
     }),
 
   guide: (topic: string, guide_type: string) =>
-    request<{ result: string; type: string }>(`${GENERATE_URL}/guide`, {
+    request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ topic, guide_type }),
+      body: JSON.stringify({ action: "guide", topic, guide_type }),
     }),
 
   productCard: (product_name: string, features: string, price: string) =>
-    request<{ result: string; type: string }>(`${GENERATE_URL}/product-card`, {
+    request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ product_name, features, price }),
+      body: JSON.stringify({ action: "product-card", product_name, features, price }),
     }),
 
   reelsAnalysis: (video_description: string, views: number, likes: number, comments: number) =>
-    request<{ result: string; type: string }>(`${GENERATE_URL}/reels-analysis`, {
+    request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ video_description, views, likes, comments }),
+      body: JSON.stringify({ action: "reels-analysis", video_description, views, likes, comments }),
     }),
 };
 

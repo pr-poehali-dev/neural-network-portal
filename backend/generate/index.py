@@ -103,7 +103,7 @@ def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     messages.append({"role": "user", "content": prompt})
 
     payload = json.dumps({
-        "model": "mistralai/mistral-7b-instruct:free",
+        "model": "openai/gpt-4o-mini",
         "messages": messages,
         "max_tokens": 2000
     }).encode()
@@ -141,14 +141,14 @@ def handler(event: dict, context) -> dict:
         except Exception:
             pass
 
-    if method == "GET" and path.endswith("/roulette"):
+    if method == "GET":
         prompt = random.choice(PHOTO_ROULETTE_PROMPTS)
         return {"statusCode": 200, "headers": headers, "body": json.dumps({"prompt": prompt})}
 
     if method != "POST":
         return {"statusCode": 405, "headers": headers, "body": json.dumps({"error": "Метод не разрешён"})}
 
-    action = path.split("/")[-1]
+    action = body.get("action", "")
 
     if action == "image-gen":
         prompt = body.get("prompt", "")
