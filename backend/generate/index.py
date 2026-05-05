@@ -139,15 +139,19 @@ def call_openai_img2img(image_bytes: bytes, prompt: str) -> bytes:
     req.add_header("Authorization", f"Bearer {api_key}")
     req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
 
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        result = json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            result = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="ignore")
+        print(f"[openai img2img] HTTP {e.code}: {err_body[:1000]}")
+        raise Exception(f"OpenAI HTTP {e.code}: {err_body[:300]}")
 
     print(f"[openai img2img] response keys: {list(result.keys())}")
     b64_data = result["data"][0].get("b64_json") or result["data"][0].get("url")
     if result["data"][0].get("b64_json"):
         return base64.b64decode(b64_data)
     else:
-        # Скачиваем по URL
         with urllib.request.urlopen(b64_data, timeout=60) as r:
             return r.read()
 
