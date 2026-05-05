@@ -56,19 +56,12 @@ def upload_image_to_s3(image_bytes: bytes, prefix: str = "generated") -> str:
     access_key = os.environ["AWS_ACCESS_KEY_ID"]
     return f"https://cdn.poehali.dev/projects/{access_key}/bucket/{key}"
 
-def call_huggingface_txt2img(prompt: str) -> bytes:
-    hf_token = os.environ.get("HUGGINGFACE_TOKEN", "")
-    model = "black-forest-labs/FLUX.1-schnell"
-    url = f"https://api-inference.huggingface.co/models/{model}"
-    payload = json.dumps({
-        "inputs": prompt,
-        "parameters": {"num_inference_steps": 4, "guidance_scale": 0.0}
-    }).encode()
-    req = urllib.request.Request(url, data=payload, method="POST")
-    req.add_header("Content-Type", "application/json")
-    req.add_header("Accept", "image/png")
-    if hf_token:
-        req.add_header("Authorization", f"Bearer {hf_token}")
+def call_pollinations_txt2img(prompt: str) -> bytes:
+    import urllib.parse
+    encoded = urllib.parse.quote(prompt)
+    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&model=flux&nologo=true&enhance=false"
+    req = urllib.request.Request(url, method="GET")
+    req.add_header("User-Agent", "Mozilla/5.0")
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
@@ -161,7 +154,7 @@ def handler(event: dict, context) -> dict:
         full_prompt += ", high quality, 8k, photorealistic"
 
         try:
-            image_bytes = call_huggingface_txt2img(full_prompt)
+            image_bytes = call_pollinations_txt2img(full_prompt)
             cdn_url = upload_image_to_s3(image_bytes, prefix="generated")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": full_prompt})}
         except Exception as e:
