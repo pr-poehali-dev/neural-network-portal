@@ -35,6 +35,10 @@ import RepurposeTool from "./pages/tools/RepurposeTool";
 import AvatarTool from "./pages/tools/AvatarTool";
 import StoriesTool from "./pages/tools/StoriesTool";
 import BrandKitTool from "./pages/tools/BrandKitTool";
+import SaleScriptTool from "./pages/tools/SaleScriptTool";
+import EmailTool from "./pages/tools/EmailTool";
+import CompetitorTool from "./pages/tools/CompetitorTool";
+import CaseTool from "./pages/tools/CaseTool";
 
 const queryClient = new QueryClient();
 
@@ -74,6 +78,10 @@ function AppRoutes() {
           <Route path="/tools/avatar" element={<AvatarTool />} />
           <Route path="/tools/stories" element={<StoriesTool />} />
           <Route path="/tools/brand-kit" element={<BrandKitTool />} />
+          <Route path="/tools/sale-script" element={<SaleScriptTool />} />
+          <Route path="/tools/email" element={<EmailTool />} />
+          <Route path="/tools/competitor" element={<CompetitorTool />} />
+          <Route path="/tools/case" element={<CaseTool />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

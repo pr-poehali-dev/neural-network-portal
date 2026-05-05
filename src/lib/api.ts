@@ -237,6 +237,34 @@ export const generateApi = {
       headers: authHeaders(),
       body: JSON.stringify({ action: "brand-kit-analysis", ...data }),
     }, 45000),
+
+  saleScript: (product: string, audience: string, objections: string, channel: string, scriptType: string) =>
+    request<{ result: string }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "sale-script", product, audience, objections, channel, script_type: scriptType }),
+    }, 45000),
+
+  emailCopy: (purpose: string, product: string, audience: string, tone: string, chain: boolean) =>
+    request<{ result: string }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "email-copy", purpose, product, audience, tone, chain }),
+    }, 45000),
+
+  competitorAnalysis: (niche: string, competitors: string, myStrengths: string, analysisType: string) =>
+    request<{ result: string }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "competitor-analysis", niche, competitors, my_strengths: myStrengths, analysis_type: analysisType }),
+    }, 45000),
+
+  caseGenerator: (caseType: string, clientName: string, problem: string, solution: string, result_text: string, metrics: string, style: string) =>
+    request<{ result: string }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "case-generator", case_type: caseType, client_name: clientName, problem, solution, result_text, metrics, style }),
+    }, 45000),
 };
 
 export const paymentsApi = {

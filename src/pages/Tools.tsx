@@ -152,6 +152,38 @@ const TOOLS = [
     color: "from-green-500/20 to-emerald-500/20 border-green-500/20",
     hint: "Настрой бренд раз и навсегда",
   },
+  {
+    icon: "MessageSquare",
+    label: "Скрипт продаж",
+    desc: "Готовые скрипты для переписки, звонков, встреч и Stories",
+    href: "/tools/sale-script",
+    color: "from-orange-500/20 to-red-500/20 border-orange-500/20",
+    hint: "Продукт + возражения = скрипт закрытия",
+  },
+  {
+    icon: "Mail",
+    label: "Email-копирайтер",
+    desc: "Продающие письма и цепочки рассылок для любой цели",
+    href: "/tools/email",
+    color: "from-blue-500/20 to-cyan-500/20 border-blue-500/20",
+    hint: "Выбери тип письма и получи готовый текст",
+  },
+  {
+    icon: "Search",
+    label: "Анализ конкурентов",
+    desc: "SWOT, контент-стратегия и позиционирование относительно конкурентов",
+    href: "/tools/competitor",
+    color: "from-red-500/20 to-pink-500/20 border-red-500/20",
+    hint: "Укажи нишу и конкурентов — получи стратегию",
+  },
+  {
+    icon: "Trophy",
+    label: "Кейсы и отзывы",
+    desc: "Убедительные кейсы до/после и живые отзывы клиентов",
+    href: "/tools/case",
+    color: "from-yellow-500/20 to-amber-500/20 border-yellow-500/20",
+    hint: "Опиши результат клиента — получи кейс",
+  },
 ];
 
 export default function Tools() {

@@ -501,6 +501,109 @@ def handler(event: dict, context) -> dict:
         result = generate_text_with_openrouter(prompt, system)
         return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result})}
 
+    elif action == "sale-script":
+        product = body.get("product", "")
+        audience = body.get("audience", "")
+        objections = body.get("objections", "")
+        channel = body.get("channel", "Переписка")
+        script_type = body.get("script_type", "Холодный контакт")
+        if not product:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите продукт"})}
+        system = "Ты — эксперт по продажам с 10-летним опытом. Пиши практичные скрипты продаж на русском языке."
+        prompt = (
+            f"Напиши детальный скрипт продаж для канала '{channel}', тип: '{script_type}'.\n"
+            f"Продукт/услуга: {product}\n"
+            f"Целевая аудитория: {audience}\n"
+            f"Основные возражения: {objections}\n\n"
+            f"Структура скрипта:\n"
+            f"1. Открытие/приветствие (с цеплялкой)\n"
+            f"2. Выявление потребности (3-5 вопросов)\n"
+            f"3. Презентация решения (на языке выгод)\n"
+            f"4. Отработка возражений (конкретные фразы для каждого)\n"
+            f"5. Закрытие сделки (2-3 варианта)\n"
+            f"6. Скрипт для случая отказа\n"
+            f"Дай конкретные фразы и реплики, не общие рекомендации."
+        )
+        result = generate_text_with_openrouter(prompt, system)
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "sale-script"})}
+
+    elif action == "email-copy":
+        purpose = body.get("purpose", "Продающее")
+        product = body.get("product", "")
+        audience = body.get("audience", "")
+        tone = body.get("tone", "Дружелюбный")
+        chain = body.get("chain", False)
+        if not product:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите продукт или тему"})}
+        system = "Ты — профессиональный email-маркетолог. Пиши письма которые открывают и читают. Русский язык."
+        if chain:
+            prompt = (
+                f"Напиши цепочку из 3 писем для email-рассылки.\n"
+                f"Тип: {purpose}. Продукт/тема: {product}. Аудитория: {audience}. Тон: {tone}.\n"
+                f"Письмо 1 (день 0): знакомство, ценность без продажи\n"
+                f"Письмо 2 (день 2): кейс/история/польза, мягкое предложение\n"
+                f"Письмо 3 (день 4): ограниченное предложение, призыв к действию\n"
+                f"Для каждого письма: тема письма, превью (preheader), полный текст, CTA-кнопка."
+            )
+        else:
+            prompt = (
+                f"Напиши {purpose.lower()} письмо для email-рассылки.\n"
+                f"Продукт/тема: {product}. Аудитория: {audience}. Тон: {tone}.\n"
+                f"Структура: тема письма (с emoji), preheader, приветствие, основной текст, "
+                f"призыв к действию (CTA), подпись. Письмо должно быть читабельным и цепляющим."
+            )
+        result = generate_text_with_openrouter(prompt, system)
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "email-copy"})}
+
+    elif action == "competitor-analysis":
+        niche = body.get("niche", "")
+        competitors = body.get("competitors", "")
+        my_strengths = body.get("my_strengths", "")
+        analysis_type = body.get("analysis_type", "SWOT-анализ")
+        if not niche or not competitors:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите нишу и конкурентов"})}
+        system = "Ты — стратег по маркетингу и конкурентному анализу. Пиши конкретно, без воды."
+        prompt = (
+            f"Проведи анализ конкурентов: {analysis_type}\n"
+            f"Ниша: {niche}\n"
+            f"Конкуренты: {competitors}\n"
+            f"Мои сильные стороны: {my_strengths}\n\n"
+        )
+        if analysis_type == "SWOT-анализ":
+            prompt += "Дай полный SWOT-анализ относительно конкурентов. Для каждого конкурента — краткий разбор. Итог: мои возможности для отстройки."
+        elif analysis_type == "Контент-стратегия":
+            prompt += "Опиши предполагаемую контент-стратегию конкурентов и предложи 10 идей контента которые позволят обойти их по охватам и вовлечённости."
+        elif analysis_type == "Ценовое позиционирование":
+            prompt += "Проанализируй ценовое позиционирование в нише, предложи стратегию ценообразования и аргументацию ценности."
+        elif analysis_type == "Аудитория":
+            prompt += "Опиши аудиторию конкурентов, их боли и желания, предложи как привлечь эту аудиторию к себе."
+        result = generate_text_with_openrouter(prompt, system)
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "competitor-analysis"})}
+
+    elif action == "case-generator":
+        case_type = body.get("case_type", "Кейс (до/после)")
+        client_name = body.get("client_name", "")
+        problem = body.get("problem", "")
+        solution = body.get("solution", "")
+        result_text = body.get("result_text", "")
+        metrics = body.get("metrics", "")
+        style = body.get("style", "Деловой")
+        if not problem or not solution:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите проблему и решение"})}
+        system = "Ты — профессиональный копирайтер. Создавай убедительные кейсы и отзывы которые продают. Русский язык."
+        prompt = (
+            f"Напиши '{case_type}' в стиле '{style}'.\n"
+            f"Клиент: {client_name or 'клиент (обезличено)'}\n"
+            f"Проблема/задача: {problem}\n"
+            f"Решение: {solution}\n"
+            f"Результат: {result_text}\n"
+            f"Метрики: {metrics}\n\n"
+            f"Требования: захватывающее начало, конкретные детали, эмоциональный отклик, "
+            f"измеримые результаты, выводы которые убеждают потенциального клиента купить."
+        )
+        result = generate_text_with_openrouter(prompt, system)
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "case-generator"})}
+
     elif action == "scenario":
         topic = body.get("topic", "")
         platform = body.get("platform", "Reels")
