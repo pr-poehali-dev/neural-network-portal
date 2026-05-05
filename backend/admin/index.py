@@ -28,7 +28,6 @@ def handler(event: dict, context) -> dict:
         return {"statusCode": 200, "headers": headers, "body": ""}
 
     method = event.get("httpMethod", "GET")
-    path = event.get("path", "/")
     query = event.get("queryStringParameters") or {}
     body = {}
     if event.get("body"):
@@ -36,6 +35,8 @@ def handler(event: dict, context) -> dict:
             body = json.loads(event["body"])
         except Exception:
             pass
+
+    action = body.get("action", "") or query.get("action", "")
 
     auth_header = event.get("headers", {}).get("X-Authorization", "")
     token = auth_header.replace("Bearer ", "").strip()
@@ -48,7 +49,7 @@ def handler(event: dict, context) -> dict:
         if not admin:
             return {"statusCode": 403, "headers": headers, "body": json.dumps({"error": "Доступ запрещён"})}
 
-        if method == "GET" and path.endswith("/stats"):
+        if method == "GET" and action == "stats":
             cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.users")
             total_users = cur.fetchone()[0]
             cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.user_subscriptions WHERE is_active = TRUE AND (expires_at IS NULL OR expires_at > NOW())")
@@ -66,7 +67,7 @@ def handler(event: dict, context) -> dict:
                 "new_users_week": new_users_week
             })}
 
-        elif method == "GET" and path.endswith("/users"):
+        elif method == "GET" and action == "users":
             search = query.get("search", "")
             sql = f"SELECT id, email, name, is_admin, bonus_generations, free_image_generations, free_carousel_generations, created_at FROM {SCHEMA}.users WHERE 1=1"
             params = []
@@ -95,7 +96,7 @@ def handler(event: dict, context) -> dict:
                 })
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"users": users})}
 
-        elif method == "POST" and path.endswith("/grant-access"):
+        elif method == "POST" and action == "grant-access":
             user_id = body.get("user_id")
             plan_slug = body.get("plan_slug", "unlimited_month")
             months = body.get("months", 1)
@@ -117,7 +118,7 @@ def handler(event: dict, context) -> dict:
             conn.commit()
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"success": True, "message": "Доступ предоставлен"})}
 
-        elif method == "POST" and path.endswith("/make-admin"):
+        elif method == "POST" and action == "make-admin":
             target_user_id = body.get("user_id")
             if not target_user_id:
                 return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "user_id обязателен"})}
@@ -125,7 +126,7 @@ def handler(event: dict, context) -> dict:
             conn.commit()
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"success": True})}
 
-        elif method == "POST" and path.endswith("/setup-founder"):
+        elif method == "POST" and action == "setup-founder":
             founder_email = body.get("email", "").strip().lower()
             if not founder_email:
                 return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "email обязателен"})}
@@ -146,7 +147,7 @@ def handler(event: dict, context) -> dict:
             conn.commit()
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"success": True, "message": "Основатель настроен, безлимитный доступ предоставлен"})}
 
-        elif method == "GET" and path.endswith("/generations"):
+        elif method == "GET" and action == "generations":
             cur.execute(
                 f"""SELECT g.id, g.tool_slug, g.prompt, g.result_url, g.created_at, u.email, u.name
                     FROM {SCHEMA}.tool_generations g

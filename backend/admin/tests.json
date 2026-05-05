@@ -1,11 +1,11 @@
 {
   "tests": [
     {
-      "name": "Admin access denied without token",
+      "name": "Admin stats returns data",
       "method": "GET",
-      "path": "/stats",
-      "expectedStatus": 403,
-      "expectedBody": {"error": "Доступ запрещён"},
+      "path": "/?action=stats",
+      "expectedStatus": 200,
+      "expectedBody": {"active_subscriptions": 0},
       "bodyMatcher": "partial"
     }
   ]

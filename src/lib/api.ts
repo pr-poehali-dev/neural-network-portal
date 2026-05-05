@@ -211,36 +211,36 @@ export const paymentsApi = {
 
 export const adminApi = {
   stats: () =>
-    request<AdminStats>(`${ADMIN_URL}/stats`, { headers: authHeaders() }),
+    request<AdminStats>(`${ADMIN_URL}?action=stats`, { headers: authHeaders() }),
 
   users: (search?: string) => {
-    const qs = search ? `?search=${search}` : "";
-    return request<{ users: AdminUser[] }>(`${ADMIN_URL}/users${qs}`, { headers: authHeaders() });
+    const qs = search ? `?action=users&search=${search}` : "?action=users";
+    return request<{ users: AdminUser[] }>(`${ADMIN_URL}${qs}`, { headers: authHeaders() });
   },
 
   grantAccess: (user_id: number, plan_slug: string, months: number) =>
-    request<{ success: boolean }>(`${ADMIN_URL}/grant-access`, {
+    request<{ success: boolean }>(ADMIN_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ user_id, plan_slug, months }),
+      body: JSON.stringify({ action: "grant-access", user_id, plan_slug, months }),
     }),
 
   makeAdmin: (user_id: number) =>
-    request<{ success: boolean }>(`${ADMIN_URL}/make-admin`, {
+    request<{ success: boolean }>(ADMIN_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ user_id }),
+      body: JSON.stringify({ action: "make-admin", user_id }),
     }),
 
   setupFounder: (email: string) =>
-    request<{ success: boolean; message: string }>(`${ADMIN_URL}/setup-founder`, {
+    request<{ success: boolean; message: string }>(ADMIN_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ action: "setup-founder", email }),
     }),
 
   generations: () =>
-    request<{ generations: Generation[] }>(`${ADMIN_URL}/generations`, { headers: authHeaders() }),
+    request<{ generations: Generation[] }>(`${ADMIN_URL}?action=generations`, { headers: authHeaders() }),
 };
 
 export interface User {
