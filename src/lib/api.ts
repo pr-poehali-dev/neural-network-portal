@@ -39,21 +39,21 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
 
 export const authApi = {
   register: (email: string, password: string, name: string, ref_code?: string) =>
-    request<{ success: boolean; user: User; token: string }>(`${AUTH_URL}/register`, {
+    request<{ success: boolean; user: User; token: string }>(AUTH_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ email, password, name, ref_code }),
+      body: JSON.stringify({ action: "register", email, password, name, ref_code }),
     }),
 
   login: (email: string, password: string) =>
-    request<{ success: boolean; user: User; token: string }>(`${AUTH_URL}/login`, {
+    request<{ success: boolean; user: User; token: string }>(AUTH_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ action: "login", email, password }),
     }),
 
   me: () =>
-    request<{ user: User }>(`${AUTH_URL}/me`, {
+    request<{ user: User }>(AUTH_URL, {
       method: "GET",
       headers: authHeaders(),
     }),
@@ -61,32 +61,32 @@ export const authApi = {
 
 export const toolsApi = {
   getCatalog: (params?: { category?: string; pricing?: string; search?: string; sort?: string }) => {
-    const qs = new URLSearchParams(params as Record<string, string>).toString();
-    return request<{ tools: AiTool[] }>(`${TOOLS_URL}/catalog${qs ? "?" + qs : ""}`, {
+    const qs = new URLSearchParams({ action: "catalog", ...(params as Record<string, string>) }).toString();
+    return request<{ tools: AiTool[] }>(`${TOOLS_URL}?${qs}`, {
       headers: authHeaders(),
     });
   },
 
   getPlans: () =>
-    request<{ plans: Plan[] }>(`${TOOLS_URL}/plans`, { headers: authHeaders() }),
+    request<{ plans: Plan[] }>(`${TOOLS_URL}?action=plans`, { headers: authHeaders() }),
 
   checkLimit: (tool_slug: string) =>
-    request<{ allowed: boolean; remaining?: number; reason?: string }>(`${TOOLS_URL}/check-limit`, {
+    request<{ allowed: boolean; remaining?: number; reason?: string }>(TOOLS_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ tool_slug }),
+      body: JSON.stringify({ action: "check-limit", tool_slug }),
     }),
 
   saveGeneration: (tool_slug: string, prompt: string, result_url?: string, result_data?: object) =>
-    request<{ success: boolean; generation_id: number }>(`${TOOLS_URL}/save-generation`, {
+    request<{ success: boolean; generation_id: number }>(TOOLS_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ tool_slug, prompt, result_url, result_data }),
+      body: JSON.stringify({ action: "save-generation", tool_slug, prompt, result_url, result_data }),
     }),
 
   myGenerations: (tool_slug?: string) => {
-    const qs = tool_slug ? `?tool_slug=${tool_slug}` : "";
-    return request<{ generations: Generation[] }>(`${TOOLS_URL}/my-generations${qs}`, {
+    const qs = tool_slug ? `?action=my-generations&tool_slug=${tool_slug}` : "?action=my-generations";
+    return request<{ generations: Generation[] }>(`${TOOLS_URL}${qs}`, {
       headers: authHeaders(),
     });
   },
@@ -184,11 +184,12 @@ export const generateApi = {
 export const paymentsApi = {
   create: (plan_slug: string, single_tool_slug?: string) =>
     request<{ payment_id?: string; confirmation_url?: string; amount: number; plan_name: string; demo?: boolean; message?: string }>(
-      `${PAYMENTS_URL}/create`,
+      PAYMENTS_URL,
       {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({
+          action: "create",
           plan_slug,
           single_tool_slug,
           return_url: `${window.location.origin}/pricing?payment=success`,
@@ -198,12 +199,12 @@ export const paymentsApi = {
 
   status: (payment_id: string) =>
     request<{ status: string; paid_at: string | null }>(
-      `${PAYMENTS_URL}/status?payment_id=${payment_id}`,
+      `${PAYMENTS_URL}?action=status&payment_id=${payment_id}`,
       { headers: authHeaders() }
     ),
 
   history: () =>
-    request<{ payments: PaymentRecord[] }>(`${PAYMENTS_URL}/history`, {
+    request<{ payments: PaymentRecord[] }>(`${PAYMENTS_URL}?action=history`, {
       headers: authHeaders(),
     }),
 };

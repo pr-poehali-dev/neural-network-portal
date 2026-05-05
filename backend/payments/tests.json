@@ -3,7 +3,7 @@
     {
       "name": "Status not found",
       "method": "GET",
-      "path": "/status?payment_id=nonexistent",
+      "path": "/?action=status&payment_id=nonexistent",
       "expectedStatus": 404,
       "expectedBody": {"error": "Платёж не найден"},
       "bodyMatcher": "partial"

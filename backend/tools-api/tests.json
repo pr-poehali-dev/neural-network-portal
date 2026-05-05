@@ -3,7 +3,7 @@
     {
       "name": "Get catalog",
       "method": "GET",
-      "path": "/catalog",
+      "path": "/?action=catalog",
       "expectedStatus": 200,
       "expectedBody": {"tools": []},
       "bodyMatcher": "partial"
@@ -11,7 +11,7 @@
     {
       "name": "Get plans",
       "method": "GET",
-      "path": "/plans",
+      "path": "/?action=plans",
       "expectedStatus": 200,
       "expectedBody": {"plans": []},
       "bodyMatcher": "partial"

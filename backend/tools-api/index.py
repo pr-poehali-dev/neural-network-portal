@@ -45,7 +45,6 @@ def handler(event: dict, context) -> dict:
         return {"statusCode": 200, "headers": headers, "body": ""}
 
     method = event.get("httpMethod", "GET")
-    path = event.get("path", "/")
     query = event.get("queryStringParameters") or {}
     body = {}
     if event.get("body"):
@@ -54,6 +53,8 @@ def handler(event: dict, context) -> dict:
         except Exception:
             pass
 
+    action = body.get("action", "") or query.get("action", "")
+
     auth_header = event.get("headers", {}).get("X-Authorization", "")
     token = auth_header.replace("Bearer ", "").strip()
 
@@ -61,7 +62,7 @@ def handler(event: dict, context) -> dict:
     cur = conn.cursor()
 
     try:
-        if method == "GET" and path.endswith("/catalog"):
+        if method == "GET" and action == "catalog":
             category = query.get("category", "")
             pricing = query.get("pricing", "")
             search = query.get("search", "")
@@ -93,7 +94,7 @@ def handler(event: dict, context) -> dict:
                 })
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"tools": tools})}
 
-        elif method == "POST" and path.endswith("/check-limit"):
+        elif method == "POST" and action == "check-limit":
             if not token:
                 return {"statusCode": 401, "headers": headers, "body": json.dumps({"error": "Необходима авторизация"})}
 
@@ -133,7 +134,7 @@ def handler(event: dict, context) -> dict:
 
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": False, "reason": "limit_exceeded"})}
 
-        elif method == "POST" and path.endswith("/save-generation"):
+        elif method == "POST" and action == "save-generation":
             if not token:
                 return {"statusCode": 401, "headers": headers, "body": json.dumps({"error": "Необходима авторизация"})}
 
@@ -165,7 +166,7 @@ def handler(event: dict, context) -> dict:
             conn.commit()
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"success": True, "generation_id": gen_id})}
 
-        elif method == "GET" and path.endswith("/my-generations"):
+        elif method == "GET" and action == "my-generations":
             if not token:
                 return {"statusCode": 401, "headers": headers, "body": json.dumps({"error": "Необходима авторизация"})}
 
@@ -195,7 +196,7 @@ def handler(event: dict, context) -> dict:
 
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"generations": generations})}
 
-        elif method == "GET" and path.endswith("/plans"):
+        elif method == "GET" and action == "plans":
             cur.execute(f"SELECT id, name, slug, price, generations_per_tool, is_unlimited, duration_months, description, is_single_tool FROM {SCHEMA}.subscription_plans WHERE is_active = TRUE ORDER BY price ASC")
             rows = cur.fetchall()
             plans = []

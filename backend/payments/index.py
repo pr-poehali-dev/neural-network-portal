@@ -47,7 +47,7 @@ def handler(event: dict, context) -> dict:
         return {"statusCode": 200, "headers": headers, "body": ""}
 
     method = event.get("httpMethod", "GET")
-    path = event.get("path", "/")
+    query = event.get("queryStringParameters") or {}
     body = {}
     if event.get("body"):
         try:
@@ -55,12 +55,14 @@ def handler(event: dict, context) -> dict:
         except Exception:
             pass
 
+    action = body.get("action", "") or query.get("action", "")
+
     conn = get_conn()
     cur = conn.cursor()
 
     try:
-        # ── POST /create — создать платёж ──────────────────────────────────
-        if method == "POST" and path.endswith("/create"):
+        # ── POST create — создать платёж ──────────────────────────────────
+        if method == "POST" and action == "create":
             auth_header = event.get("headers", {}).get("X-Authorization", "")
             token = auth_header.replace("Bearer ", "").strip()
             if not token:
@@ -153,8 +155,8 @@ def handler(event: dict, context) -> dict:
                 })
             }
 
-        # ── POST /webhook — получить уведомление от ЮКассы ────────────────
-        elif method == "POST" and path.endswith("/webhook"):
+        # ── POST webhook — получить уведомление от ЮКассы ────────────────
+        elif method == "POST" and action == "webhook":
             event_type = body.get("event", "")
             payment_obj = body.get("object", {})
 
@@ -203,9 +205,8 @@ def handler(event: dict, context) -> dict:
 
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"ok": True})}
 
-        # ── GET /status?payment_id=xxx — проверить статус платежа ─────────
-        elif method == "GET" and path.endswith("/status"):
-            query = event.get("queryStringParameters") or {}
+        # ── GET status?payment_id=xxx — проверить статус платежа ─────────
+        elif method == "GET" and action == "status":
             payment_id = query.get("payment_id", "")
 
             if not payment_id:
@@ -228,8 +229,8 @@ def handler(event: dict, context) -> dict:
                 })
             }
 
-        # ── GET /history — история платежей пользователя ──────────────────
-        elif method == "GET" and path.endswith("/history"):
+        # ── GET history — история платежей пользователя ──────────────────
+        elif method == "GET" and action == "history":
             auth_header = event.get("headers", {}).get("X-Authorization", "")
             token = auth_header.replace("Bearer ", "").strip()
             if not token:

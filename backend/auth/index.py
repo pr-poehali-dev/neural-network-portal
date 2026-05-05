@@ -30,13 +30,14 @@ def handler(event: dict, context) -> dict:
         return {"statusCode": 200, "headers": headers, "body": ""}
 
     method = event.get("httpMethod", "GET")
-    path = event.get("path", "/")
     body = {}
     if event.get("body"):
         try:
             body = json.loads(event["body"])
         except Exception:
             pass
+
+    action = body.get("action", "")
 
     try:
         conn = get_conn()
@@ -46,7 +47,7 @@ def handler(event: dict, context) -> dict:
     cur = conn.cursor()
 
     try:
-        if method == "POST" and path.endswith("/register"):
+        if method == "POST" and action == "register":
             email = body.get("email", "").strip().lower()
             password = body.get("password", "")
             name = body.get("name", "").strip()
@@ -103,7 +104,7 @@ def handler(event: dict, context) -> dict:
                 })
             }
 
-        elif method == "POST" and path.endswith("/login"):
+        elif method == "POST" and action == "login":
             email = body.get("email", "").strip().lower()
             password = body.get("password", "")
             pw_hash = hash_password(password)
@@ -157,7 +158,7 @@ def handler(event: dict, context) -> dict:
                 })
             }
 
-        elif method == "GET" and path.endswith("/me"):
+        elif method == "GET":
             auth_header = event.get("headers", {}).get("X-Authorization", "")
             token = auth_header.replace("Bearer ", "").strip()
             if not token:

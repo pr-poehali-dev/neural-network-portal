@@ -3,8 +3,8 @@
     {
       "name": "Register new user",
       "method": "POST",
-      "path": "/register",
-      "body": {"email": "test_neural@example.com", "password": "test123", "name": "Тестовый пользователь"},
+      "path": "/",
+      "body": {"action": "register", "email": "test_neural@example.com", "password": "test123", "name": "Тестовый пользователь"},
       "expectedStatus": 200,
       "expectedBody": {"success": true},
       "bodyMatcher": "partial"
@@ -12,8 +12,8 @@
     {
       "name": "Login user",
       "method": "POST",
-      "path": "/login",
-      "body": {"email": "test_neural@example.com", "password": "test123"},
+      "path": "/",
+      "body": {"action": "login", "email": "test_neural@example.com", "password": "test123"},
       "expectedStatus": 200,
       "expectedBody": {"success": true},
       "bodyMatcher": "partial"
