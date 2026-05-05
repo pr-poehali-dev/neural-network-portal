@@ -16,9 +16,9 @@ function authHeaders() {
   };
 }
 
-async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(url: string, options: RequestInit = {}, timeoutMs = 15000): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { ...options, signal: controller.signal });
     clearTimeout(timeout);
@@ -131,7 +131,7 @@ export const generateApi = {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({ action: "content-plan", niche, period, goals, platforms }),
-    }),
+    }, 90000),
 
   carousel: (topic: string, slides_count: number) =>
     request<{ result: string; type: string }>(GENERATE_URL, {
