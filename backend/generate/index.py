@@ -501,6 +501,71 @@ def handler(event: dict, context) -> dict:
         result = generate_text_with_openrouter(prompt, system)
         return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result})}
 
+    elif action == "ai-assistant":
+        message = body.get("message", "")
+        history = body.get("history", [])
+        if not message:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Сообщение пустое"})}
+
+        TOOL_MAP = {
+            "пост": ("/tools/post", "Написать пост", "Wand2"),
+            "карусель": ("/tools/carousel", "Создать карусель", "LayoutTemplate"),
+            "хэштег": ("/tools/hashtags", "Подобрать хэштеги", "Hash"),
+            "контент-план": ("/tools/content-plan", "Контент-план", "CalendarDays"),
+            "изображен": ("/tools/image-gen", "Сгенерировать фото", "ImagePlus"),
+            "презентац": ("/tools/presentation", "Создать презентацию", "Presentation"),
+            "сценарий": ("/tools/scenario", "Написать сценарий", "Clapperboard"),
+            "скрипт": ("/tools/sale-script", "Скрипт продаж", "MessageSquare"),
+            "email": ("/tools/email", "Email-копирайтер", "Mail"),
+            "шапк": ("/tools/bio", "Шапка профиля", "UserCircle"),
+            "кейс": ("/tools/case", "Генератор кейсов", "Trophy"),
+            "конкурент": ("/tools/competitor", "Анализ конкурентов", "Search"),
+            "stories": ("/tools/stories", "Генератор Stories", "Smartphone"),
+            "аватар": ("/tools/avatar", "ИИ-аватар", "UserCircle2"),
+            "гайд": ("/tools/guide", "Создать гайд", "BookOpen"),
+            "воронк": ("/tools/funnel", "Воронка продаж", "TrendingUp"),
+        }
+
+        system = (
+            "Ты — дружелюбный ИИ-ассистент платформы Neural AI для создания контента. "
+            "Отвечай кратко (2-4 предложения), по-русски, с конкретной помощью. "
+            "Если пользователь просит создать контент — выполни задачу прямо здесь (напиши пост, хэштеги, идеи и т.д.), "
+            "а не просто отправь куда-то. Будь полезным и тёплым."
+        )
+        messages_list = []
+        for h in history[-6:]:
+            messages_list.append({"role": h.get("role", "user"), "content": h.get("text", "")})
+        messages_list.append({"role": "user", "content": message})
+
+        payload = json.dumps({
+            "model": "openai/gpt-4o-mini",
+            "messages": [{"role": "system", "content": system}] + messages_list,
+            "max_tokens": 600
+        }).encode()
+        req = urllib.request.Request("https://openrouter.ai/api/v1/chat/completions", data=payload, method="POST")
+        req.add_header("Content-Type", "application/json")
+        req.add_header("Authorization", f"Bearer {os.environ.get('OPENROUTER_API_KEY', '')}")
+        req.add_header("HTTP-Referer", "https://neuralai.poehali.dev")
+
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                data_r = json.loads(resp.read())
+            reply = data_r["choices"][0]["message"]["content"]
+        except Exception as e:
+            reply = "Извини, произошла ошибка. Попробуй ещё раз!"
+
+        # Определяем подходящие инструменты по ключевым словам
+        msg_lower = message.lower()
+        actions = []
+        for keyword, (href, label, icon) in TOOL_MAP.items():
+            if keyword in msg_lower and len(actions) < 3:
+                actions.append({"label": label, "href": href, "icon": icon})
+
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({
+            "reply": reply,
+            "actions": actions if actions else None
+        })}
+
     elif action == "sale-script":
         product = body.get("product", "")
         audience = body.get("audience", "")

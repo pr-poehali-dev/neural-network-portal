@@ -265,6 +265,13 @@ export const generateApi = {
       headers: authHeaders(),
       body: JSON.stringify({ action: "case-generator", case_type: caseType, client_name: clientName, problem, solution, result_text, metrics, style }),
     }, 45000),
+
+  aiAssistant: (message: string, history: Array<{role: string, text: string}>) =>
+    request<{ reply: string; actions?: Array<{label: string; href: string; icon: string}> }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "ai-assistant", message, history }),
+    }, 30000),
 };
 
 export const paymentsApi = {

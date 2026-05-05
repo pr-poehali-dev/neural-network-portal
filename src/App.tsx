@@ -39,6 +39,9 @@ import SaleScriptTool from "./pages/tools/SaleScriptTool";
 import EmailTool from "./pages/tools/EmailTool";
 import CompetitorTool from "./pages/tools/CompetitorTool";
 import CaseTool from "./pages/tools/CaseTool";
+import Dashboard from "./pages/Dashboard";
+import Prompts from "./pages/Prompts";
+import AIAssistant from "./components/AIAssistant";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +51,7 @@ function AppRoutes() {
   return (
     <AuthContext.Provider value={auth}>
       <BrowserRouter>
+        <AIAssistant />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/catalog" element={<Catalog />} />
@@ -82,6 +86,8 @@ function AppRoutes() {
           <Route path="/tools/email" element={<EmailTool />} />
           <Route path="/tools/competitor" element={<CompetitorTool />} />
           <Route path="/tools/case" element={<CaseTool />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/prompts" element={<Prompts />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

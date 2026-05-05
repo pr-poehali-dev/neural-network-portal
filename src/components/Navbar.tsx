@@ -14,11 +14,11 @@ import {
 
 const navLinks = [
   { href: "/", label: "Главная" },
+  { href: "/dashboard", label: "Мой кабинет", authOnly: true },
   { href: "/tools", label: "Инструменты" },
+  { href: "/prompts", label: "Промты" },
   { href: "/catalog", label: "Каталог ИИ" },
   { href: "/pricing", label: "Тарифы" },
-  { href: "/rating", label: "Рейтинг" },
-  { href: "/blog", label: "Блог" },
 ];
 
 export default function Navbar() {
@@ -37,19 +37,22 @@ export default function Navbar() {
           </Link>
 
           <div className="hidden md:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                className={`px-3 py-2 text-sm transition-colors rounded-md ${
-                  location.pathname === link.href
-                    ? "text-primary"
-                    : "text-white/60 hover:text-white"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              if (link.authOnly && !user) return null;
+              return (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  className={`px-3 py-2 text-sm transition-colors rounded-md ${
+                    location.pathname === link.href
+                      ? "text-primary"
+                      : "text-white/60 hover:text-white"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </div>
 
           <div className="flex items-center gap-3">
@@ -111,20 +114,23 @@ export default function Navbar() {
 
         {mobileOpen && (
           <div className="md:hidden border-t border-white/5 py-3 px-4 flex flex-col gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                onClick={() => setMobileOpen(false)}
-                className={`px-3 py-2.5 text-sm rounded-lg transition-colors ${
-                  location.pathname === link.href
-                    ? "text-primary bg-primary/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5"
-                }`}
-              >
-                {link.label}
-              </Link>
-            ))}
+            {navLinks.map((link) => {
+              if (link.authOnly && !user) return null;
+              return (
+                <Link
+                  key={link.href}
+                  to={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className={`px-3 py-2.5 text-sm rounded-lg transition-colors ${
+                    location.pathname === link.href
+                      ? "text-primary bg-primary/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </div>
         )}
       </nav>
