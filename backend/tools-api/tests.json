@@ -1,0 +1,20 @@
+{
+  "tests": [
+    {
+      "name": "Get catalog",
+      "method": "GET",
+      "path": "/catalog",
+      "expectedStatus": 200,
+      "expectedBody": {"tools": []},
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Get plans",
+      "method": "GET",
+      "path": "/plans",
+      "expectedStatus": 200,
+      "expectedBody": {"plans": []},
+      "bodyMatcher": "partial"
+    }
+  ]
+}
