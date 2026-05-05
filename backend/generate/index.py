@@ -262,25 +262,33 @@ def handler(event: dict, context) -> dict:
         niche = body.get("niche", "")
         period = body.get("period", "месяц")
         goals = body.get("goals", "рост подписчиков")
+        platforms = body.get("platforms", ["Instagram"])
+        platforms_str = ", ".join(platforms) if isinstance(platforms, list) else str(platforms)
+
         system = (
-            "Ты — стратег контент-маркетинга. Отвечай ТОЛЬКО валидным JSON-массивом без лишнего текста. "
-            "Каждый элемент массива — объект с полями: "
-            "date (строка, например '01.06'), topic (тема поста), format (Reels/Карусель/Пост/Сторис), "
-            "platform (Instagram/VK/Telegram), hashtags (3-5 хэштегов через пробел), notes (краткая заметка)."
+            "Ты — стратег контент-маркетинга. Отвечай ТОЛЬКО валидным JSON-массивом без лишнего текста, markdown и пояснений. "
+            "Каждый элемент массива — объект строго с полями: "
+            "date (строка даты, например '01.06'), "
+            "topic (развёрнутая тема поста — 1-2 предложения, конкретно и цепляюще), "
+            "scenario (мини-сценарий публикации: крючок, основная мысль, призыв — 2-3 предложения), "
+            "format (один из: Reels/Карусель/Пост/Сторис/Статья/Видео/Shorts — подходящий под платформу), "
+            "notes (краткие заметки по съёмке, оформлению или времени публикации), "
+            "lifehacks (1-2 конкретных лайфхака для этого поста: как усилить охват, вовлечённость или конверсию)."
         )
         prompt = (
-            f"Создай контент-план на {period} для ниши '{niche}'. Цели: {goals}. "
-            f"Верни JSON-массив минимум из 20 объектов. Только JSON, без markdown и пояснений."
+            f"Создай контент-план на {period} для ниши '{niche}'. "
+            f"Платформы: {platforms_str}. Цели: {goals}. "
+            f"Верни JSON-массив минимум из 20 объектов, равномерно распределив по платформам. "
+            f"Только JSON, без markdown и пояснений."
         )
         raw_result = generate_text_with_openrouter(prompt, system)
 
-        # Пробуем распарсить JSON из ответа
         rows = None
         try:
-            # Убираем возможные ```json ... ``` обёртки
             clean = raw_result.strip()
             if clean.startswith("```"):
-                clean = clean.split("```")[1]
+                parts = clean.split("```")
+                clean = parts[1] if len(parts) > 1 else clean
                 if clean.startswith("json"):
                     clean = clean[4:]
                 clean = clean.strip()

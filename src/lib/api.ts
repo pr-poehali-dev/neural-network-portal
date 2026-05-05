@@ -126,11 +126,11 @@ export const generateApi = {
       body: JSON.stringify({ action: "scenario", topic, platform, duration }),
     }),
 
-  contentPlan: (niche: string, period: string, goals: string) =>
+  contentPlan: (niche: string, period: string, goals: string, platforms: string[]) =>
     request<{ result: string; rows: ContentPlanRow[] | null; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ action: "content-plan", niche, period, goals }),
+      body: JSON.stringify({ action: "content-plan", niche, period, goals, platforms }),
     }),
 
   carousel: (topic: string, slides_count: number) =>
@@ -297,10 +297,10 @@ export interface AiTool {
 export interface ContentPlanRow {
   date: string;
   topic: string;
+  scenario: string;
   format: string;
-  platform: string;
-  hashtags: string;
   notes: string;
+  lifehacks: string;
 }
 
 export interface Generation {
