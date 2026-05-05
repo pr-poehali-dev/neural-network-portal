@@ -32,6 +32,9 @@ import ImageGenTool from "./pages/tools/ImageGenTool";
 import HashtagTool from "./pages/tools/HashtagTool";
 import BioTool from "./pages/tools/BioTool";
 import RepurposeTool from "./pages/tools/RepurposeTool";
+import AvatarTool from "./pages/tools/AvatarTool";
+import StoriesTool from "./pages/tools/StoriesTool";
+import BrandKitTool from "./pages/tools/BrandKitTool";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +71,9 @@ function AppRoutes() {
           <Route path="/tools/hashtags" element={<HashtagTool />} />
           <Route path="/tools/bio" element={<BioTool />} />
           <Route path="/tools/repurpose" element={<RepurposeTool />} />
+          <Route path="/tools/avatar" element={<AvatarTool />} />
+          <Route path="/tools/stories" element={<StoriesTool />} />
+          <Route path="/tools/brand-kit" element={<BrandKitTool />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

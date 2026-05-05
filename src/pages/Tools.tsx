@@ -127,6 +127,31 @@ const TOOLS = [
     color: "from-amber-500/20 to-yellow-500/20 border-amber-500/20",
     hint: "Вставь текст и выбери нужные форматы",
   },
+  {
+    icon: "UserCircle2",
+    label: "ИИ-аватар бренда",
+    desc: "Загрузи фото — получи аватары в 12 стилях: арт, аниме, 3D, киберпанк",
+    href: "/tools/avatar",
+    color: "from-violet-500/20 to-fuchsia-500/20 border-violet-500/20",
+    free: true,
+    hint: "Загрузи фото и выбери стили",
+  },
+  {
+    icon: "Smartphone",
+    label: "Генератор Stories",
+    desc: "Готовый визуал для Instagram Stories с красивым фоном",
+    href: "/tools/stories",
+    color: "from-pink-500/20 to-purple-500/20 border-pink-500/20",
+    hint: "Тема + текст = готовая Stories",
+  },
+  {
+    icon: "Shield",
+    label: "Бренд-кит",
+    desc: "Заполни один раз — все инструменты знают твой стиль и нишу",
+    href: "/tools/brand-kit",
+    color: "from-green-500/20 to-emerald-500/20 border-green-500/20",
+    hint: "Настрой бренд раз и навсегда",
+  },
 ];
 
 export default function Tools() {

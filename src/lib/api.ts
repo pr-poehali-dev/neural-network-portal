@@ -216,6 +216,27 @@ export const generateApi = {
       headers: authHeaders(),
       body: JSON.stringify({ action: "repurpose", text, formats }),
     }, 60000),
+
+  avatarGen: (image_b64: string, style_prompt: string, style_id: string) =>
+    request<{ image_url: string }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "avatar-gen", image_b64, style_prompt, style_id }),
+    }, 120000),
+
+  storiesGen: (topic: string, main_text: string, sub_text: string, bg_prompt: string) =>
+    request<{ image_url: string }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "stories-gen", topic, main_text, sub_text, bg_prompt }),
+    }, 120000),
+
+  brandKitAnalysis: (data: Record<string, string>) =>
+    request<{ result: string }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "brand-kit-analysis", ...data }),
+    }, 45000),
 };
 
 export const paymentsApi = {

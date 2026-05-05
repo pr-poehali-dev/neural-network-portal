@@ -441,6 +441,66 @@ def handler(event: dict, context) -> dict:
                 results[fmt] = generate_text_with_openrouter(format_prompts[fmt], system)
         return {"statusCode": 200, "headers": headers, "body": json.dumps({"results": results})}
 
+    elif action == "avatar-gen":
+        image_b64 = body.get("image_b64", "")
+        style_prompt = body.get("style_prompt", "professional portrait")
+        if not image_b64:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Загрузите фото"})}
+        try:
+            img_bytes = base64.b64decode(image_b64)
+            result_bytes = generate_slide_image_with_photo(style_prompt, "high quality portrait, detailed", image_b64)
+            cdn_url = upload_image_to_s3(result_bytes, prefix="avatars")
+            return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url})}
+        except Exception as e:
+            print(f"[avatar-gen error] {e}")
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Ошибка генерации: {str(e)}"})}
+
+    elif action == "stories-gen":
+        topic = body.get("topic", "")
+        main_text = body.get("main_text", "")
+        sub_text = body.get("sub_text", "")
+        bg_prompt = body.get("bg_prompt", "vibrant gradient background")
+        if not main_text:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Введите текст для Stories"})}
+        try:
+            # Генерируем фон через Pollinations в формате 9:16
+            full_prompt = f"{bg_prompt}, vertical format, instagram story background, no text, no letters, abstract"
+            encoded_prompt = urllib.parse.quote(full_prompt)
+            url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=576&height=1024&model=flux&nologo=true&enhance=false"
+            req_img = urllib.request.Request(url, method="GET")
+            req_img.add_header("User-Agent", "Mozilla/5.0")
+            with urllib.request.urlopen(req_img, timeout=90) as resp:
+                img_bytes = resp.read()
+            cdn_url = upload_image_to_s3(img_bytes, prefix="stories")
+            return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "main_text": main_text, "sub_text": sub_text})}
+        except Exception as e:
+            print(f"[stories-gen error] {e}")
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Ошибка: {str(e)}"})}
+
+    elif action == "brand-kit-analysis":
+        brand_name = body.get("brandName", "")
+        niche = body.get("niche", "")
+        audience = body.get("targetAudience", "")
+        tone = body.get("tone", "")
+        keywords = body.get("keywords", "")
+        usp = body.get("usp", "")
+        colors = body.get("mainColors", "")
+        system = "Ты — эксперт по личному брендингу и маркетингу в соцсетях. Пиши структурированно и конкретно."
+        prompt = (
+            f"Проведи анализ бренда и дай конкретные рекомендации:\n"
+            f"Бренд: {brand_name}\nНиша: {niche}\nАудитория: {audience}\n"
+            f"Тон: {tone}\nКлючевые слова: {keywords}\nУТП: {usp}\nЦвета: {colors}\n\n"
+            f"Дай анализ по разделам:\n"
+            f"1. Сильные стороны бренда\n"
+            f"2. Что улучшить в позиционировании\n"
+            f"3. Рекомендуемые форматы контента\n"
+            f"4. Ключевые темы для постов (10 идей)\n"
+            f"5. Советы по tone of voice\n"
+            f"6. Потенциальные точки роста"
+        )
+        result = generate_text_with_openrouter(prompt, system)
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result})}
+
     elif action == "scenario":
         topic = body.get("topic", "")
         platform = body.get("platform", "Reels")
