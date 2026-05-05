@@ -74,65 +74,52 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
-def call_openai_img2img(image_bytes: bytes, prompt: str) -> bytes:
-    """Редактирование изображения через OpenAI gpt-image-1"""
-    import io, struct, zlib
-
-    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+def describe_image_with_gemini(image_bytes: bytes) -> str:
+    """Описывает изображение через Gemini Vision"""
+    api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
-        raise Exception("OPENROUTER_API_KEY не настроен")
-
-    # Конвертируем в PNG если нужно — делаем через raw bytes
-    # Строим multipart вручную
-    boundary = "----Boundary" + uuid.uuid4().hex
-
-    def field(name, value):
-        return (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
-            f"{value}\r\n"
-        ).encode()
-
-    def file_field(name, filename, content_type, data):
-        return (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'
-            f"Content-Type: {content_type}\r\n\r\n"
-        ).encode() + data + b"\r\n"
-
-    body = (
-        field("model", "openai/gpt-image-1") +
-        field("prompt", prompt) +
-        field("n", "1") +
-        field("size", "1024x1024") +
-        file_field("image[]", "image.png", "image/png", image_bytes) +
-        f"--{boundary}--\r\n".encode()
-    )
-
-    req = urllib.request.Request(
-        "https://openrouter.ai/api/v1/images/edits",
-        data=body, method="POST"
-    )
-    req.add_header("Authorization", f"Bearer {api_key}")
-    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
-
+        return ""
+    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+    payload = json.dumps({
+        "contents": [{
+            "parts": [
+                {"text": "Describe this image in detail for use as a generation prompt. Include: main subject, style, colors, lighting, composition, mood. Be specific and concise, max 100 words."},
+                {"inline_data": {"mime_type": "image/png", "data": image_b64}}
+            ]
+        }]
+    }).encode()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key}"
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             result = json.loads(resp.read())
-        print(f"[openai img2img] response: {str(result)[:200]}")
-        data_list = result.get("data", [])
-        if data_list:
-            item = data_list[0]
-            if "b64_json" in item:
-                return base64.b64decode(item["b64_json"])
-            if "url" in item:
-                with urllib.request.urlopen(item["url"], timeout=60) as r:
-                    return r.read()
-        raise Exception(f"Нет изображения в ответе: {str(result)[:300]}")
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[openai img2img error] {e.code}: {err_body[:500]}")
-        raise Exception(f"Ошибка редактирования: {err_body[:300]}")
+        return result["candidates"][0]["content"]["parts"][0]["text"]
+    except Exception as e:
+        print(f"[gemini vision error] {e}")
+        return ""
+
+def call_img2img_via_description(image_bytes: bytes, prompt: str) -> bytes:
+    """Img2img через: описание исходного фото + генерация нового с учётом правок"""
+    import urllib.parse
+
+    image_description = describe_image_with_gemini(image_bytes)
+    print(f"[img2img] image description: {image_description[:200]}")
+
+    if image_description:
+        full_prompt = f"{image_description}. Changes: {prompt}"
+    else:
+        full_prompt = prompt
+
+    full_prompt += ", high quality, photorealistic, 8k"
+
+    w, h = 1024, 1024
+    encoded = urllib.parse.quote(full_prompt)
+    url = f"https://image.pollinations.ai/prompt/{encoded}?width={w}&height={h}&model=flux&nologo=true&enhance=false&seed={random.randint(1,99999)}"
+    req = urllib.request.Request(url, method="GET")
+    req.add_header("User-Agent", "Mozilla/5.0")
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return resp.read()
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
@@ -224,7 +211,7 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
 
         try:
-            result_bytes = call_openai_img2img(image_bytes, prompt)
+            result_bytes = call_img2img_via_description(image_bytes, prompt)
             cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
         except Exception as e:
