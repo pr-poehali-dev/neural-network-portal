@@ -74,44 +74,50 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
-def call_nano_banana_img2img(image_bytes: bytes, prompt: str) -> bytes:
-    """Редактирование фото через Gemini 2.5 Flash Image (Nano Banana) — бесплатно 500 req/day"""
-    api_key = os.environ.get("GEMINI_API_KEY", "")
-    if not api_key:
-        raise Exception("GEMINI_API_KEY не настроен")
+def call_cloudflare_img2img(image_bytes: bytes, prompt: str) -> bytes:
+    """Редактирование фото через Cloudflare Workers AI (img2img) — бесплатно 10k/день"""
+    account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
+    api_token = os.environ.get("CLOUDFLARE_API_TOKEN", "")
+    if not api_token:
+        raise Exception("CLOUDFLARE_API_TOKEN не настроен")
 
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
     payload = json.dumps({
-        "contents": [{
-            "parts": [
-                {"text": prompt},
-                {"inline_data": {"mime_type": "image/png", "data": image_b64}}
-            ]
-        }],
-        "generationConfig": {
-            "responseModalities": ["IMAGE", "TEXT"]
-        }
+        "prompt": prompt,
+        "image": image_b64,
+        "strength": 0.75,
+        "num_steps": 20,
+        "guidance": 7.5,
     }).encode()
 
-    # Nano Banana = gemini-2.5-flash-image
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key={api_key}"
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/runwayml/stable-diffusion-v1-5-img2img"
     req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Authorization", f"Bearer {api_token}")
     req.add_header("Content-Type", "application/json")
 
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
-            result = json.loads(resp.read())
-        print(f"[nano-banana] success")
-        parts = result["candidates"][0]["content"]["parts"]
-        for part in parts:
-            if "inlineData" in part:
-                return base64.b64decode(part["inlineData"]["data"])
-        raise Exception(f"Модель не вернула изображение: {str(result)[:300]}")
+            raw = resp.read()
+        # Cloudflare возвращает либо JSON с base64, либо сырые байты изображения
+        try:
+            result = json.loads(raw)
+            print(f"[cloudflare] json response keys: {list(result.keys())}")
+            if result.get("success") and result.get("result"):
+                r = result["result"]
+                if isinstance(r, str):
+                    return base64.b64decode(r)
+                if isinstance(r, dict) and "image" in r:
+                    return base64.b64decode(r["image"])
+            raise Exception(f"Неожиданный ответ: {str(result)[:300]}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            # Ответ — сырые байты PNG
+            print(f"[cloudflare] got raw image bytes: {len(raw)}")
+            return raw
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[nano-banana error] {e.code}: {err_body[:500]}")
-        raise Exception(f"Ошибка Nano Banana {e.code}: {err_body[:200]}")
+        print(f"[cloudflare error] {e.code}: {err_body[:500]}")
+        raise Exception(f"Cloudflare AI error {e.code}: {err_body[:200]}")
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
@@ -203,7 +209,7 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
 
         try:
-            result_bytes = call_nano_banana_img2img(image_bytes, prompt)
+            result_bytes = call_cloudflare_img2img(image_bytes, prompt)
             cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
         except Exception as e:
