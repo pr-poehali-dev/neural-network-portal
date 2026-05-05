@@ -27,10 +27,12 @@ async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
     return data as T;
   } catch (err: unknown) {
     clearTimeout(timeout);
+    console.error("[API Error]", url, err);
     if (err instanceof Error && err.name === "AbortError") {
       throw new Error("Сервер не отвечает. Проверьте интернет и попробуйте снова.");
     }
     if (err instanceof TypeError) {
+      console.error("[API TypeError details]", err.message, err.stack);
       throw new Error("Нет соединения с сервером. Проверьте интернет.");
     }
     throw err;
