@@ -127,7 +127,7 @@ export const generateApi = {
     }),
 
   contentPlan: (niche: string, period: string, goals: string, platforms: string[]) =>
-    request<{ result: string; rows: ContentPlanRow[] | null; type: string }>(GENERATE_URL, {
+    request<{ result: string; intro: string; rows: ContentPlanRow[] | null; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({ action: "content-plan", niche, period, goals, platforms }),
