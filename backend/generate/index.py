@@ -74,21 +74,45 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
-def call_pollinations_img2img(image_bytes: bytes, prompt: str, size: str = "square") -> bytes:
-    import urllib.parse
+def call_stability_img2img(image_bytes: bytes, prompt: str, size: str = "square") -> bytes:
+    import urllib.parse, io
+    api_key = os.environ.get("STABILITY_API_KEY", "")
+    if not api_key:
+        raise Exception("STABILITY_API_KEY не настроен")
+
     w, h = SIZE_MAP.get(size, (1024, 1024))
-    image_b64 = base64.b64encode(image_bytes).decode()
-    encoded_prompt = urllib.parse.quote(prompt)
-    payload = json.dumps({
-        "model": "flux",
-        "prompt": prompt,
-        "width": w,
-        "height": h,
-        "nologo": True,
-        "image": image_b64
-    }).encode()
-    req = urllib.request.Request("https://image.pollinations.ai/prompt/" + encoded_prompt + f"?width={w}&height={h}&model=flux&nologo=true", method="GET")
-    req.add_header("User-Agent", "Mozilla/5.0")
+    boundary = "----FormBoundary" + uuid.uuid4().hex
+
+    def field(name, value):
+        return (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
+            f"{value}\r\n"
+        ).encode()
+
+    def file_field(name, filename, content_type, data):
+        return (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="{name}"; filename="{filename}"\r\n'
+            f"Content-Type: {content_type}\r\n\r\n"
+        ).encode() + data + b"\r\n"
+
+    body = (
+        field("prompt", prompt) +
+        field("output_format", "png") +
+        field("strength", "0.75") +
+        file_field("image", "image.png", "image/png", image_bytes) +
+        f"--{boundary}--\r\n".encode()
+    )
+
+    req = urllib.request.Request(
+        "https://api.stability.ai/v2beta/stable-image/generate/sd3",
+        data=body, method="POST"
+    )
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Accept", "image/*")
+    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
@@ -182,7 +206,7 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
 
         try:
-            result_bytes = call_pollinations_img2img(image_bytes, prompt, size)
+            result_bytes = call_stability_img2img(image_bytes, prompt, size)
             cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
         except Exception as e:
