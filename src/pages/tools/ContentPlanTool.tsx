@@ -221,20 +221,22 @@ export default function ContentPlanTool() {
                   <span className="text-sm font-medium text-white">Контент-план готов</span>
                   <Button
                     onClick={() => {
-                      const blob = new Blob([rawResult], { type: "text/plain;charset=utf-8" });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement("a");
-                      a.href = url;
-                      a.download = `контент-план-${niche.slice(0, 20)}.txt`;
-                      a.click();
-                      URL.revokeObjectURL(url);
+                      const lines = rawResult.split("\n").filter(l => l.trim());
+                      const ws = XLSX.utils.aoa_to_sheet(lines.map(line => {
+                        const cols = line.replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+                        return cols.length > 1 ? cols : [line];
+                      }));
+                      ws["!cols"] = Array(6).fill({ wch: 35 });
+                      const wb = XLSX.utils.book_new();
+                      XLSX.utils.book_append_sheet(wb, ws, "Контент-план");
+                      XLSX.writeFile(wb, `контент-план-${niche.slice(0, 20)}.xlsx`);
                       toast.success("Файл скачан!");
                     }}
                     size="sm"
                     className="bg-green-600 hover:bg-green-500 text-white gap-2"
                   >
                     <Icon name="Download" size={14} />
-                    Скачать .txt
+                    Скачать Excel
                   </Button>
                 </div>
                 <div className="p-5">
