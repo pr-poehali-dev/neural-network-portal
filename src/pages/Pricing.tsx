@@ -9,61 +9,129 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 
 const TOOL_NAMES: Record<string, string> = {
-  "post": "Генерация постов",
-  "carousel": "Пост-карусель",
-  "scenario": "Сценарии",
+  "post":         "Генерация постов",
+  "carousel":     "Пост-карусель",
+  "scenario":     "Сценарии для видео",
   "content-plan": "Контент-план",
-  "profile": "Анализ профиля",
-  "funnel": "Воронки продаж",
+  "profile":      "Анализ профиля",
+  "funnel":       "Воронки продаж",
   "presentation": "Презентации",
-  "guide": "Гайды и чеклисты",
+  "guide":        "Гайды и чеклисты",
   "product-card": "Карточки товаров",
-  "reels": "Аналитика Reels",
-  "image-gen": "Генерация изображений",
-  "roulette": "Фото-рулетка",
+  "reels":        "Аналитика Reels",
+  "image-gen":    "Генерация изображений",
+  "roulette":     "Фото-рулетка",
+  "hashtags":     "Хэштег-анализатор",
+  "bio":          "Шапка профиля",
+  "repurpose":    "Переупаковщик контента",
+  "avatar":       "ИИ-аватар бренда",
+  "stories":      "Генератор Stories",
+  "brand-kit":    "Бренд-кит",
+  "sale-script":  "Скрипт продаж",
+  "email":        "Email-копирайтер",
+  "competitor":   "Анализ конкурентов",
+  "case":         "Кейсы и отзывы",
+  "naming":       "Названия и слоганы",
+  "ad-copy":      "Рекламные объявления",
+  "comments":     "Комментарии для прогрева",
 };
 
 const PLAN_HIGHLIGHTS: Record<string, { color: string; badge?: string; features: string[] }> = {
   start_3: {
     color: "border-white/10",
-    features: ["3 генерации на каждый инструмент", "Все 12 инструментов", "Генерация текстов и изображений", "История генераций"],
+    features: [
+      "3 генерации на каждый инструмент",
+      "Все 25 ИИ-инструментов",
+      "Посты, карусели, сценарии, хэштеги",
+      "Скрипты продаж, кейсы, email",
+      "История генераций",
+    ],
   },
   basic_5: {
     color: "border-blue-500/30",
     badge: "ПОПУЛЯРНЫЙ",
-    features: ["5 генераций на каждый инструмент", "Все 12 инструментов", "Приоритетная обработка", "История генераций"],
+    features: [
+      "5 генераций на каждый инструмент",
+      "Все 25 ИИ-инструментов",
+      "Генерация изображений и аватаров",
+      "Контент-план + Excel экспорт",
+      "Презентации PPTX с картинками",
+      "История генераций",
+    ],
   },
   advanced_10: {
     color: "border-violet-500/30",
-    features: ["10 генераций на каждый инструмент", "Все 12 инструментов", "Приоритетная обработка", "История генераций"],
+    features: [
+      "10 генераций на каждый инструмент",
+      "Все 25 ИИ-инструментов",
+      "Бренд-кит и анализ конкурентов",
+      "Рекламные объявления для Директа/VK",
+      "Переупаковщик контента",
+      "История генераций",
+    ],
   },
   unlimited_month: {
     color: "border-primary/40",
     badge: "ЛУЧШИЙ ВЫБОР",
-    features: ["Безлимитные генерации", "Все 12 инструментов", "Максимальный приоритет", "История генераций"],
+    features: [
+      "Безлимитные генерации",
+      "Все 25 ИИ-инструментов",
+      "ИИ-ассистент без ограничений",
+      "Stories, аватары, презентации",
+      "Контент-план с аналитикой",
+      "Приоритетная обработка",
+    ],
   },
   single_tool: {
     color: "border-orange-500/20",
-    features: ["15 генераций", "1 выбранный инструмент", "Подходит для тестирования", "Всегда доступен"],
+    features: [
+      "15 генераций",
+      "1 инструмент на выбор из 25",
+      "Подходит для тестирования",
+      "Полный функционал инструмента",
+    ],
   },
   single_tool_unlimited: {
     color: "border-orange-500/30",
-    features: ["Безлимитные генерации", "1 выбранный инструмент", "Лучшее решение для специалиста"],
+    features: [
+      "Безлимитные генерации",
+      "1 инструмент на выбор из 25",
+      "Идеально для специалиста",
+      "Полный функционал инструмента",
+    ],
   },
   unlimited_3m: {
     color: "border-primary/30",
     badge: "ЭКОНОМИЯ 22%",
-    features: ["Безлимит на 3 месяца", "Все 12 инструментов", "Максимальный приоритет", "История генераций"],
+    features: [
+      "Безлимит на 3 месяца",
+      "Все 25 ИИ-инструментов",
+      "Новые инструменты автоматически",
+      "Приоритетная обработка",
+      "История генераций",
+    ],
   },
   unlimited_6m: {
     color: "border-primary/40",
     badge: "ЭКОНОМИЯ 33%",
-    features: ["Безлимит на 6 месяцев", "Все 12 инструментов", "Максимальный приоритет", "Полная история"],
+    features: [
+      "Безлимит на 6 месяцев",
+      "Все 25 ИИ-инструментов",
+      "Новые инструменты автоматически",
+      "Максимальный приоритет",
+      "Полная история генераций",
+    ],
   },
   unlimited_year: {
     color: "border-primary/50",
     badge: "МАКСИМУМ ЭКОНОМИИ",
-    features: ["Безлимит на 12 месяцев", "Все 12 инструментов", "Максимальный приоритет", "VIP поддержка"],
+    features: [
+      "Безлимит на 12 месяцев",
+      "Все 25 ИИ-инструментов",
+      "Новые инструменты автоматически",
+      "Максимальный приоритет",
+      "VIP поддержка",
+    ],
   },
 };
 
@@ -334,8 +402,48 @@ export default function Pricing() {
           </div>
         )}
 
-        {/* FAQ */}
+        {/* Все инструменты */}
         <div className="mt-16 glass rounded-xl p-8 border border-white/5">
+          <h2 className="text-xl font-display font-bold text-white mb-2 text-center">Все 25 инструментов включены</h2>
+          <p className="text-white/40 text-sm text-center mb-8">В любом платном тарифе — полный доступ к платформе</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {[
+              { icon: "Wand2",         label: "Генерация постов" },
+              { icon: "LayoutTemplate",label: "Пост-карусель" },
+              { icon: "Clapperboard",  label: "Сценарии для видео" },
+              { icon: "CalendarDays",  label: "Контент-план" },
+              { icon: "ImagePlus",     label: "Генерация изображений" },
+              { icon: "Presentation",  label: "Презентации PPTX" },
+              { icon: "Hash",          label: "Хэштег-анализатор" },
+              { icon: "UserCircle",    label: "Шапка профиля" },
+              { icon: "RefreshCw",     label: "Переупаковщик" },
+              { icon: "UserCircle2",   label: "ИИ-аватар бренда" },
+              { icon: "Smartphone",    label: "Генератор Stories" },
+              { icon: "Shield",        label: "Бренд-кит" },
+              { icon: "MessageSquare", label: "Скрипт продаж" },
+              { icon: "Mail",          label: "Email-копирайтер" },
+              { icon: "Search",        label: "Анализ конкурентов" },
+              { icon: "Trophy",        label: "Кейсы и отзывы" },
+              { icon: "Sparkles",      label: "Названия и слоганы" },
+              { icon: "Megaphone",     label: "Рекламные объявления" },
+              { icon: "MessageCircle", label: "Комментарии" },
+              { icon: "BarChart3",     label: "Анализ профиля" },
+              { icon: "TrendingUp",    label: "Воронки продаж" },
+              { icon: "BookOpen",      label: "Гайды и чеклисты" },
+              { icon: "ShoppingBag",   label: "Карточки товаров" },
+              { icon: "FileVideo",     label: "Аналитика Reels" },
+              { icon: "Shuffle",       label: "Фото-рулетка" },
+            ].map((tool) => (
+              <div key={tool.label} className="flex items-center gap-2 bg-white/[0.03] rounded-lg px-3 py-2 border border-white/5">
+                <Icon name={tool.icon} size={13} className="text-primary flex-shrink-0" />
+                <span className="text-xs text-white/60 truncate">{tool.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* FAQ */}
+        <div className="mt-8 glass rounded-xl p-8 border border-white/5">
           <h2 className="text-xl font-display font-bold text-white mb-6 text-center">Часто задаваемые вопросы</h2>
           <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
             {[
