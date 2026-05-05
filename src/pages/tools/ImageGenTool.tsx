@@ -13,17 +13,27 @@ const STYLE_PRESETS = [
   "Фотореализм", "Аниме", "Акварель", "Масло", "Пиксель арт", "3D рендер", "Минимализм", "Ретро",
 ];
 
+const SIZE_OPTIONS = [
+  { value: "square",    label: "1:1",   desc: "Квадрат",    icon: "□" },
+  { value: "portrait",  label: "3:4",   desc: "Портрет",    icon: "▯" },
+  { value: "landscape", label: "4:3",   desc: "Пейзаж",     icon: "▭" },
+  { value: "story",     label: "9:16",  desc: "Сторис",     icon: "▯" },
+  { value: "wide",      label: "16:9",  desc: "Широкий",    icon: "▭" },
+];
+
 export default function ImageGenTool() {
   const [tab, setTab] = useState<"generate" | "edit">("generate");
 
   const [prompt, setPrompt] = useState("");
   const [style, setStyle] = useState("");
+  const [size, setSize] = useState("square");
   const [loading, setLoading] = useState(false);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
 
   const [editPrompt, setEditPrompt] = useState("");
   const [editImage, setEditImage] = useState<string | null>(null);
   const [editImageFile, setEditImageFile] = useState<string | null>(null);
+  const [editSize, setEditSize] = useState("square");
   const [editLoading, setEditLoading] = useState(false);
   const [editResultUrl, setEditResultUrl] = useState<string | null>(null);
 
@@ -56,7 +66,7 @@ export default function ImageGenTool() {
     setResultUrl(null);
     try {
       const fullPrompt = style ? `${prompt}, style: ${style}` : prompt;
-      const res = await generateApi.imageGen(fullPrompt, style);
+      const res = await generateApi.imageGen(fullPrompt, style, size);
       setResultUrl(res.image_url);
       await toolsApi.saveGeneration("image-gen", fullPrompt, res.image_url);
       toast.success("Изображение создано!");
@@ -89,7 +99,7 @@ export default function ImageGenTool() {
     setEditLoading(true);
     setEditResultUrl(null);
     try {
-      const res = await generateApi.imageEdit(editImageFile, editPrompt);
+      const res = await generateApi.imageEdit(editImageFile, editPrompt, editSize);
       setEditResultUrl(res.image_url);
       await toolsApi.saveGeneration("image-edit", editPrompt, res.image_url);
       toast.success("Фото отредактировано!");
@@ -147,6 +157,20 @@ export default function ImageGenTool() {
                       <button key={s} onClick={() => setStyle(s)}
                         className={`px-3 py-1.5 text-xs rounded-lg transition-all ${style === s ? "bg-white/20 text-white font-medium" : "bg-white/5 text-white/40 hover:text-white"}`}>
                         {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-sm text-white/60 mb-1.5 block">Размер</label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {SIZE_OPTIONS.map((s) => (
+                      <button key={s.value} onClick={() => setSize(s.value)}
+                        className={`flex flex-col items-center py-2 px-1 rounded-lg text-xs transition-all gap-1 ${size === s.value ? "bg-primary text-black font-medium" : "bg-white/5 text-white/40 hover:text-white"}`}>
+                        <span className="text-base leading-none">{s.icon}</span>
+                        <span className="font-medium">{s.label}</span>
+                        <span className="text-[10px] opacity-70">{s.desc}</span>
                       </button>
                     ))}
                   </div>
@@ -221,6 +245,20 @@ export default function ImageGenTool() {
                     placeholder="Например: сделай закат оранжевым, добавь снег, измени фон на лесной пейзаж"
                     className="w-full bg-white/5 border border-white/10 text-white placeholder:text-white/25 rounded-lg p-3 text-sm min-h-[80px] resize-none focus:outline-none focus:border-primary/50"
                   />
+                </div>
+
+                <div>
+                  <label className="text-sm text-white/60 mb-1.5 block">Размер результата</label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {SIZE_OPTIONS.map((s) => (
+                      <button key={s.value} onClick={() => setEditSize(s.value)}
+                        className={`flex flex-col items-center py-2 px-1 rounded-lg text-xs transition-all gap-1 ${editSize === s.value ? "bg-primary text-black font-medium" : "bg-white/5 text-white/40 hover:text-white"}`}>
+                        <span className="text-base leading-none">{s.icon}</span>
+                        <span className="font-medium">{s.label}</span>
+                        <span className="text-[10px] opacity-70">{s.desc}</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <Button onClick={editPhoto} disabled={editLoading} className="w-full bg-primary text-black font-semibold hover:bg-primary/90">

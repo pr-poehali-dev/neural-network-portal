@@ -56,33 +56,39 @@ def upload_image_to_s3(image_bytes: bytes, prefix: str = "generated") -> str:
     access_key = os.environ["AWS_ACCESS_KEY_ID"]
     return f"https://cdn.poehali.dev/projects/{access_key}/bucket/{key}"
 
-def call_pollinations_txt2img(prompt: str) -> bytes:
+SIZE_MAP = {
+    "square":    (1024, 1024),
+    "portrait":  (768, 1024),
+    "landscape": (1024, 768),
+    "story":     (576, 1024),
+    "wide":      (1280, 720),
+}
+
+def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
     import urllib.parse
+    w, h = SIZE_MAP.get(size, (1024, 1024))
     encoded = urllib.parse.quote(prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&model=flux&nologo=true&enhance=false"
+    url = f"https://image.pollinations.ai/prompt/{encoded}?width={w}&height={h}&model=flux&nologo=true&enhance=false"
     req = urllib.request.Request(url, method="GET")
     req.add_header("User-Agent", "Mozilla/5.0")
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
-def call_huggingface_img2img(image_bytes: bytes, prompt: str) -> bytes:
-    hf_token = os.environ.get("HUGGINGFACE_TOKEN", "")
-    model = "timbrooks/instruct-pix2pix"
-    url = f"https://api-inference.huggingface.co/models/{model}"
+def call_pollinations_img2img(image_bytes: bytes, prompt: str, size: str = "square") -> bytes:
+    import urllib.parse
+    w, h = SIZE_MAP.get(size, (1024, 1024))
     image_b64 = base64.b64encode(image_bytes).decode()
+    encoded_prompt = urllib.parse.quote(prompt)
     payload = json.dumps({
-        "inputs": prompt,
-        "parameters": {
-            "image": image_b64,
-            "num_inference_steps": 20,
-            "image_guidance_scale": 1.5,
-            "guidance_scale": 7.0
-        }
+        "model": "flux",
+        "prompt": prompt,
+        "width": w,
+        "height": h,
+        "nologo": True,
+        "image": image_b64
     }).encode()
-    req = urllib.request.Request(url, data=payload, method="POST")
-    req.add_header("Content-Type", "application/json")
-    if hf_token:
-        req.add_header("Authorization", f"Bearer {hf_token}")
+    req = urllib.request.Request("https://image.pollinations.ai/prompt/" + encoded_prompt + f"?width={w}&height={h}&model=flux&nologo=true", method="GET")
+    req.add_header("User-Agent", "Mozilla/5.0")
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
@@ -147,6 +153,7 @@ def handler(event: dict, context) -> dict:
     if action == "image-gen":
         prompt = body.get("prompt", "")
         style = body.get("style", "")
+        size = body.get("size", "square")
         if not prompt:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите описание изображения"})}
 
@@ -154,19 +161,18 @@ def handler(event: dict, context) -> dict:
         full_prompt += ", high quality, 8k, photorealistic"
 
         try:
-            image_bytes = call_pollinations_txt2img(full_prompt)
+            image_bytes = call_pollinations_txt2img(full_prompt, size)
             cdn_url = upload_image_to_s3(image_bytes, prefix="generated")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": full_prompt})}
         except Exception as e:
             error_msg = str(e)
             print(f"[image-gen error] {error_msg}")
-            if "503" in error_msg or "loading" in error_msg.lower():
-                return {"statusCode": 503, "headers": headers, "body": json.dumps({"error": "Модель загружается, попробуйте через 30 секунд"})}
             return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Ошибка генерации: {error_msg}"})}
 
     elif action == "image-edit":
         prompt = body.get("prompt", "")
         image_b64 = body.get("image_base64", "")
+        size = body.get("size", "square")
         if not prompt or not image_b64:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите изображение и описание изменений"})}
 
@@ -176,13 +182,12 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
 
         try:
-            result_bytes = call_huggingface_img2img(image_bytes, prompt)
+            result_bytes = call_pollinations_img2img(image_bytes, prompt, size)
             cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
         except Exception as e:
             error_msg = str(e)
-            if "503" in error_msg or "loading" in error_msg.lower():
-                return {"statusCode": 503, "headers": headers, "body": json.dumps({"error": "Модель загружается, попробуйте через 30 секунд"})}
+            print(f"[image-edit error] {error_msg}")
             return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Ошибка редактирования: {error_msg}"})}
 
     elif action == "post":
