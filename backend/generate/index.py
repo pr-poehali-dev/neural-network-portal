@@ -74,52 +74,44 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
-def describe_image_with_gemini(image_bytes: bytes) -> str:
-    """Описывает изображение через Gemini Vision"""
+def call_nano_banana_img2img(image_bytes: bytes, prompt: str) -> bytes:
+    """Редактирование фото через Gemini 2.5 Flash Image (Nano Banana) — бесплатно 500 req/day"""
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
-        return ""
+        raise Exception("GEMINI_API_KEY не настроен")
+
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+
     payload = json.dumps({
         "contents": [{
             "parts": [
-                {"text": "Describe this image in detail for use as a generation prompt. Include: main subject, style, colors, lighting, composition, mood. Be specific and concise, max 100 words."},
+                {"text": prompt},
                 {"inline_data": {"mime_type": "image/png", "data": image_b64}}
             ]
-        }]
+        }],
+        "generationConfig": {
+            "responseModalities": ["IMAGE", "TEXT"]
+        }
     }).encode()
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key={api_key}"
+
+    # Nano Banana = gemini-2.5-flash-image
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent?key={api_key}"
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Content-Type", "application/json")
+
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=120) as resp:
             result = json.loads(resp.read())
-        return result["candidates"][0]["content"]["parts"][0]["text"]
-    except Exception as e:
-        print(f"[gemini vision error] {e}")
-        return ""
-
-def call_img2img_via_description(image_bytes: bytes, prompt: str) -> bytes:
-    """Img2img через: описание исходного фото + генерация нового с учётом правок"""
-    import urllib.parse
-
-    image_description = describe_image_with_gemini(image_bytes)
-    print(f"[img2img] image description: {image_description[:200]}")
-
-    if image_description:
-        full_prompt = f"{image_description}. Changes: {prompt}"
-    else:
-        full_prompt = prompt
-
-    full_prompt += ", high quality, photorealistic, 8k"
-
-    w, h = 1024, 1024
-    encoded = urllib.parse.quote(full_prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded}?width={w}&height={h}&model=flux&nologo=true&enhance=false&seed={random.randint(1,99999)}"
-    req = urllib.request.Request(url, method="GET")
-    req.add_header("User-Agent", "Mozilla/5.0")
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return resp.read()
+        print(f"[nano-banana] success")
+        parts = result["candidates"][0]["content"]["parts"]
+        for part in parts:
+            if "inlineData" in part:
+                return base64.b64decode(part["inlineData"]["data"])
+        raise Exception(f"Модель не вернула изображение: {str(result)[:300]}")
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="ignore")
+        print(f"[nano-banana error] {e.code}: {err_body[:500]}")
+        raise Exception(f"Ошибка Nano Banana {e.code}: {err_body[:200]}")
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
@@ -211,7 +203,7 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
 
         try:
-            result_bytes = call_img2img_via_description(image_bytes, prompt)
+            result_bytes = call_nano_banana_img2img(image_bytes, prompt)
             cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
         except Exception as e:
