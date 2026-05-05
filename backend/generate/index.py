@@ -74,12 +74,40 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
+def get_gemini_image_models() -> list:
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
+    req = urllib.request.Request(url, method="GET")
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = json.loads(resp.read())
+    models = data.get("models", [])
+    return [m["name"] for m in models if "generateContent" in m.get("supportedGenerationMethods", [])]
+
 def call_gemini_img2img(image_bytes: bytes, prompt: str) -> bytes:
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         raise Exception("GEMINI_API_KEY не настроен")
 
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+
+    # Пробуем модели по приоритету
+    candidates = [
+        "gemini-2.0-flash-preview-image-generation",
+        "gemini-2.0-flash-exp",
+        "gemini-2.0-flash",
+        "gemini-1.5-flash",
+    ]
+
+    # Получаем актуальный список и ищем модель с поддержкой изображений
+    try:
+        available = get_gemini_image_models()
+        print(f"[gemini] available models: {available}")
+        image_models = [m for m in available if "image" in m.lower() or "flash" in m.lower()]
+        if image_models:
+            candidates = [m.replace("models/", "")] + candidates
+            candidates = [image_models[0].replace("models/", "")] + candidates
+    except Exception as ex:
+        print(f"[gemini] failed to list models: {ex}")
 
     payload = json.dumps({
         "contents": [{
@@ -93,24 +121,27 @@ def call_gemini_img2img(image_bytes: bytes, prompt: str) -> bytes:
         }
     }).encode()
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={api_key}"
-    req = urllib.request.Request(url, data=payload, method="POST")
-    req.add_header("Content-Type", "application/json")
+    last_error = None
+    for model_name in candidates:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        req = urllib.request.Request(url, data=payload, method="POST")
+        req.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                result = json.loads(resp.read())
+            print(f"[gemini] success with model: {model_name}")
+            parts = result["candidates"][0]["content"]["parts"]
+            for part in parts:
+                if "inlineData" in part:
+                    return base64.b64decode(part["inlineData"]["data"])
+            raise Exception(f"Модель {model_name} не вернула изображение")
+        except urllib.error.HTTPError as e:
+            err_body = e.read().decode("utf-8", errors="ignore")
+            print(f"[gemini] model {model_name} error {e.code}: {err_body[:200]}")
+            last_error = f"{model_name}: {e.code}"
+            continue
 
-    try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            result = json.loads(resp.read())
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[gemini error] {e.code}: {err_body}")
-        raise Exception(f"Gemini error {e.code}: {err_body}")
-
-    parts = result["candidates"][0]["content"]["parts"]
-    for part in parts:
-        if "inlineData" in part:
-            return base64.b64decode(part["inlineData"]["data"])
-
-    raise Exception("Gemini не вернул изображение")
+    raise Exception(f"Ни одна модель Gemini не сработала. Последняя ошибка: {last_error}")
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
