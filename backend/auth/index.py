@@ -38,7 +38,11 @@ def handler(event: dict, context) -> dict:
         except Exception:
             pass
 
-    conn = get_conn()
+    try:
+        conn = get_conn()
+    except Exception as e:
+        return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Ошибка соединения с БД: {str(e)}"})}
+
     cur = conn.cursor()
 
     try:
@@ -202,6 +206,9 @@ def handler(event: dict, context) -> dict:
 
         return {"statusCode": 404, "headers": headers, "body": json.dumps({"error": "Маршрут не найден"})}
 
+    except Exception as e:
+        conn.rollback()
+        return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": str(e)})}
     finally:
         cur.close()
         conn.close()

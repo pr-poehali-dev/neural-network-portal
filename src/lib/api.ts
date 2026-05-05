@@ -17,10 +17,24 @@ function authHeaders() {
 }
 
 async function request<T>(url: string, options: RequestInit = {}): Promise<T> {
-  const res = await fetch(url, options);
-  const data = await res.json();
-  if (!res.ok && data.error) throw new Error(data.error);
-  return data as T;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeout);
+    const data = await res.json();
+    if (!res.ok && data.error) throw new Error(data.error);
+    return data as T;
+  } catch (err: unknown) {
+    clearTimeout(timeout);
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error("Сервер не отвечает. Проверьте интернет и попробуйте снова.");
+    }
+    if (err instanceof TypeError) {
+      throw new Error("Нет соединения с сервером. Проверьте интернет.");
+    }
+    throw err;
+  }
 }
 
 export const authApi = {
