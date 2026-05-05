@@ -106,13 +106,13 @@ def call_cloudflare_img2img(image_bytes: bytes, prompt: str) -> bytes:
 
     payload = json.dumps({
         "prompt": prompt,
-        "image": [{"role": "user", "content": image_b64}],
+        "image": image_b64,
         "strength": 0.75,
         "num_steps": 20,
         "guidance": 7.5,
     }).encode()
 
-    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/black-forest-labs/flux-1-schnell"
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/runwayml/stable-diffusion-v1-5-img2img"
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Authorization", f"Bearer {api_token}")
     req.add_header("Content-Type", "application/json")
@@ -125,20 +125,22 @@ def call_cloudflare_img2img(image_bytes: bytes, prompt: str) -> bytes:
         print(f"[cloudflare img2img] HTTP {e.code}: {err_body[:1000]}")
         raise Exception(f"Cloudflare HTTP {e.code}: {err_body[:300]}")
 
-    # CF возвращает либо JSON с base64, либо сырые байты PNG
+    # stable-diffusion-v1-5-img2img возвращает сырые байты PNG
     if raw[:4] == b'\x89PNG' or raw[:2] == b'\xff\xd8':
         print(f"[cloudflare img2img] got raw image: {len(raw)} bytes")
         return raw
 
-    result = json.loads(raw)
-    print(f"[cloudflare img2img] response: {str(result)[:300]}")
-
-    if result.get("success") and result.get("result"):
-        img_data = result["result"].get("image")
-        if img_data:
-            return base64.b64decode(img_data)
-
-    raise Exception(f"Cloudflare вернул неожиданный ответ: {str(result)[:200]}")
+    # Или JSON с base64
+    try:
+        result = json.loads(raw)
+        print(f"[cloudflare img2img] response: {str(result)[:300]}")
+        if result.get("result") and isinstance(result["result"], str):
+            return base64.b64decode(result["result"])
+        if result.get("result", {}).get("image"):
+            return base64.b64decode(result["result"]["image"])
+        raise Exception(f"Cloudflare неожиданный ответ: {str(result)[:200]}")
+    except (json.JSONDecodeError, KeyError):
+        raise Exception(f"Cloudflare вернул нераспознанный формат: {len(raw)} bytes")
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
