@@ -7,25 +7,38 @@ import AuthModal from "@/components/AuthModal";
 import { useAuth } from "@/hooks/useAuth";
 
 const TOOLS = [
-  { icon: "ImagePlus", label: "Генерация изображений", desc: "По промту или смена стиля фото", href: "/tools/image-gen", color: "from-violet-500/20 to-purple-500/20", free: true },
-  { icon: "LayoutTemplate", label: "Пост-карусель", desc: "Слайды для Instagram с ИИ", href: "/tools/carousel", color: "from-pink-500/20 to-rose-500/20", free: true },
-  { icon: "FileVideo", label: "Аналитика Reels", desc: "Разбор видео и рекомендации", href: "/tools/reels", color: "from-orange-500/20 to-red-500/20" },
-  { icon: "Clapperboard", label: "Сценарии", desc: "Сценарии для Reels и TikTok", href: "/tools/scenario", color: "from-yellow-500/20 to-orange-500/20" },
-  { icon: "Wand2", label: "Генерация постов", desc: "Продающие посты для соцсетей", href: "/tools/post", color: "from-green-500/20 to-teal-500/20" },
-  { icon: "CalendarDays", label: "Контент-план", desc: "Таблица постов на месяц", href: "/tools/content-plan", color: "from-teal-500/20 to-cyan-500/20" },
-  { icon: "BarChart3", label: "Анализ профиля", desc: "Стратегия продвижения на месяц", href: "/tools/profile", color: "from-cyan-500/20 to-blue-500/20" },
-  { icon: "TrendingUp", label: "Воронки продаж", desc: "Воронки для каждой соцсети", href: "/tools/funnel", color: "from-blue-500/20 to-indigo-500/20" },
-  { icon: "Presentation", label: "Презентации", desc: "Структура слайдов с ИИ", href: "/tools/presentation", color: "from-indigo-500/20 to-violet-500/20" },
-  { icon: "BookOpen", label: "Гайды и чеклисты", desc: "Красиво оформленные документы", href: "/tools/guide", color: "from-violet-500/20 to-pink-500/20" },
-  { icon: "ShoppingBag", label: "Карточки товаров", desc: "Продающие описания для маркетплейсов", href: "/tools/product-card", color: "from-pink-500/20 to-rose-500/20" },
-  { icon: "Shuffle", label: "Фото-рулетка", desc: "Случайные промты для крутых фото", href: "/tools/roulette", color: "from-rose-500/20 to-orange-500/20" },
+  { icon: "ImagePlus",     label: "Генерация изображений",  desc: "По промту или редактирование фото с ИИ", href: "/tools/image-gen",   color: "from-violet-500/20 to-purple-500/20", free: true },
+  { icon: "LayoutTemplate",label: "Пост-карусель",          desc: "Слайды с текстом и картинками для Instagram", href: "/tools/carousel",    color: "from-pink-500/20 to-rose-500/20",   free: true },
+  { icon: "Wand2",         label: "Генерация постов",       desc: "Посты с выбором длины, языка и стиля эмодзи", href: "/tools/post",        color: "from-green-500/20 to-teal-500/20" },
+  { icon: "CalendarDays",  label: "Контент-план",           desc: "Excel-таблица с планом, аналитикой и советами", href: "/tools/content-plan",color: "from-teal-500/20 to-cyan-500/20" },
+  { icon: "Hash",          label: "Хэштег-анализатор",     desc: "30 хэштегов по частотности для любой ниши", href: "/tools/hashtags",    color: "from-sky-500/20 to-blue-500/20",    free: true },
+  { icon: "UserCircle",    label: "Шапка профиля",          desc: "3 варианта bio для Instagram, TikTok, Telegram", href: "/tools/bio",         color: "from-emerald-500/20 to-green-500/20" },
+  { icon: "Presentation",  label: "Презентации PPTX",       desc: "Красивый файл с картинками под тему — скачивай", href: "/tools/presentation",color: "from-indigo-500/20 to-violet-500/20" },
+  { icon: "MessageSquare", label: "Скрипт продаж",          desc: "Готовые фразы для переписки, звонков и встреч", href: "/tools/sale-script", color: "from-orange-500/20 to-red-500/20" },
+  { icon: "RefreshCw",     label: "Переупаковщик контента", desc: "Один текст → пост, карусель, email, тред", href: "/tools/repurpose",   color: "from-amber-500/20 to-yellow-500/20" },
+  { icon: "UserCircle2",   label: "ИИ-аватар бренда",      desc: "Фото → аватар в 12 стилях: арт, аниме, 3D", href: "/tools/avatar",      color: "from-fuchsia-500/20 to-violet-500/20" },
+  { icon: "Mail",          label: "Email-копирайтер",       desc: "Письма и цепочки рассылок для любой цели", href: "/tools/email",       color: "from-blue-500/20 to-cyan-500/20" },
+  { icon: "Search",        label: "Анализ конкурентов",     desc: "SWOT, контент-стратегия, позиционирование", href: "/tools/competitor",  color: "from-red-500/20 to-pink-500/20" },
+  { icon: "Sparkles",      label: "Названия и слоганы",     desc: "6 вариантов названия бренда со слоганами", href: "/tools/naming",      color: "from-fuchsia-500/20 to-pink-500/20" },
+  { icon: "Megaphone",     label: "Рекламные объявления",   desc: "Объявления для Яндекс.Директ, VK, Telegram", href: "/tools/ad-copy",    color: "from-rose-500/20 to-red-500/20" },
+  { icon: "Shield",        label: "Бренд-кит",              desc: "Заполни один раз — все инструменты знают стиль", href: "/tools/brand-kit",  color: "from-green-500/20 to-emerald-500/20" },
+  { icon: "Clapperboard",  label: "Сценарии для видео",     desc: "Сценарии и конвертер текста в видео-формат", href: "/tools/scenario",    color: "from-yellow-500/20 to-orange-500/20" },
 ];
 
 const STATS = [
-  { value: "22+", label: "ИИ-инструментов" },
+  { value: "25+", label: "ИИ-инструментов" },
   { value: "100%", label: "На русском языке" },
   { value: "1 клик", label: "До результата" },
   { value: "∞", label: "Идей для контента" },
+];
+
+const REVIEWS = [
+  { name: "Анастасия К.", role: "SMM-специалист", text: "Контент-план за 2 минуты вместо 4 часов. Экспортирую в Excel и сразу отдаю клиенту. Это магия.", avatar: "А" },
+  { name: "Михаил Д.", role: "Владелец онлайн-школы", text: "Скрипт продаж закрывает возражения лучше, чем я сам придумывал годами. Конверсия выросла на 30%.", avatar: "М" },
+  { name: "Ольга Р.", role: "Блогер, 85к подписчиков", text: "Хэштеги подобраны идеально — охваты выросли в 2 раза за месяц. Теперь пользуюсь каждый день.", avatar: "О" },
+  { name: "Дмитрий В.", role: "Владелец интернет-магазина", text: "Карточки товаров для WB пишутся за минуту. Раньше платил копирайтеру, теперь справляюсь сам.", avatar: "Д" },
+  { name: "Карина Л.", role: "Фотограф", text: "ИИ-аватары в разных стилях — клиенты в восторге. Предлагаю это как дополнительную услугу и зарабатываю.", avatar: "К" },
+  { name: "Артём С.", role: "Таргетолог", text: "Рекламные объявления для Директа генерирую за 30 секунд. 4 варианта, выбираю лучший — экономия времени огромная.", avatar: "А" },
 ];
 
 const DAILY_TIPS = [
@@ -196,6 +209,36 @@ export default function Index() {
         </div>
       </section>
 
+      {/* Отзывы */}
+      <section className="py-20 px-4 bg-white/[0.02]">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-12">
+            <p className="tag-pill text-primary/60 mb-3">ОТЗЫВЫ</p>
+            <h2 className="text-3xl md:text-4xl font-display font-bold text-white">Что говорят пользователи</h2>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {REVIEWS.map((r) => (
+              <div key={r.name} className="glass rounded-xl border border-white/5 p-5 hover:border-white/10 transition-colors">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-primary/20 border border-primary/30 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
+                    {r.avatar}
+                  </div>
+                  <div>
+                    <p className="text-white font-medium text-sm">{r.name}</p>
+                    <p className="text-white/40 text-xs">{r.role}</p>
+                  </div>
+                  <div className="ml-auto flex gap-0.5">
+                    {[1,2,3,4,5].map(i => <Icon key={i} name="Star" size={11} className="text-yellow-400 fill-yellow-400" />)}
+                  </div>
+                </div>
+                <p className="text-sm text-white/60 leading-relaxed">«{r.text}»</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Реферальная программа */}
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto">
           <div className="glass rounded-2xl p-8 md:p-12 text-center border border-primary/10 bg-gradient-to-br from-primary/5 to-transparent">
@@ -216,10 +259,7 @@ export default function Index() {
                 </Button>
               </Link>
             ) : (
-              <Button
-                onClick={() => setAuthOpen(true)}
-                className="bg-primary text-black font-semibold hover:bg-primary/90"
-              >
+              <Button onClick={() => setAuthOpen(true)} className="bg-primary text-black font-semibold hover:bg-primary/90">
                 Зарегистрироваться и получить ссылку
               </Button>
             )}
@@ -235,16 +275,51 @@ export default function Index() {
         </div>
       )}
 
-      <footer className="border-t border-white/5 py-10 px-4">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className="font-display font-bold neon-text">NEURAL AI</span>
-            <span className="text-white/20 text-sm">— платформа ИИ-инструментов для контента</span>
+      <footer className="border-t border-white/5 py-14 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-10">
+            <div className="col-span-2 md:col-span-1">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="font-display font-bold neon-text text-xl">NEURAL AI</span>
+              </div>
+              <p className="text-white/30 text-sm leading-relaxed">
+                Платформа ИИ-инструментов для создания контента на русском языке
+              </p>
+            </div>
+            <div>
+              <p className="text-white/60 font-medium text-sm mb-3">Инструменты</p>
+              <div className="flex flex-col gap-2 text-sm text-white/30">
+                <Link to="/tools/post" className="hover:text-white transition-colors">Генерация постов</Link>
+                <Link to="/tools/carousel" className="hover:text-white transition-colors">Пост-карусель</Link>
+                <Link to="/tools/hashtags" className="hover:text-white transition-colors">Хэштеги</Link>
+                <Link to="/tools/content-plan" className="hover:text-white transition-colors">Контент-план</Link>
+                <Link to="/tools" className="hover:text-primary transition-colors text-primary/50">Все 25 инструментов →</Link>
+              </div>
+            </div>
+            <div>
+              <p className="text-white/60 font-medium text-sm mb-3">Для бизнеса</p>
+              <div className="flex flex-col gap-2 text-sm text-white/30">
+                <Link to="/tools/sale-script" className="hover:text-white transition-colors">Скрипты продаж</Link>
+                <Link to="/tools/email" className="hover:text-white transition-colors">Email-копирайтер</Link>
+                <Link to="/tools/ad-copy" className="hover:text-white transition-colors">Реклама</Link>
+                <Link to="/tools/competitor" className="hover:text-white transition-colors">Анализ конкурентов</Link>
+                <Link to="/tools/presentation" className="hover:text-white transition-colors">Презентации</Link>
+              </div>
+            </div>
+            <div>
+              <p className="text-white/60 font-medium text-sm mb-3">Платформа</p>
+              <div className="flex flex-col gap-2 text-sm text-white/30">
+                <Link to="/pricing" className="hover:text-white transition-colors">Тарифы</Link>
+                <Link to="/prompts" className="hover:text-white transition-colors">Библиотека промтов</Link>
+                <Link to="/catalog" className="hover:text-white transition-colors">Каталог ИИ</Link>
+                <Link to="/blog" className="hover:text-white transition-colors">Блог</Link>
+                <Link to="/referral" className="hover:text-white transition-colors">Реферальная программа</Link>
+              </div>
+            </div>
           </div>
-          <div className="flex gap-6 text-sm text-white/30">
-            <Link to="/pricing" className="hover:text-white transition-colors">Тарифы</Link>
-            <Link to="/catalog" className="hover:text-white transition-colors">Каталог ИИ</Link>
-            <Link to="/blog" className="hover:text-white transition-colors">Блог</Link>
+          <div className="border-t border-white/5 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <p className="text-white/20 text-xs">© 2025 Neural AI. Все права защищены.</p>
+            <p className="text-white/15 text-xs">25 инструментов · 100% на русском · ИИ-ассистент</p>
           </div>
         </div>
       </footer>
