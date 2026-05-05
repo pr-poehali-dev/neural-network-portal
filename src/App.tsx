@@ -29,6 +29,9 @@ import ProductCardTool from "./pages/tools/ProductCardTool";
 import ReelsTool from "./pages/tools/ReelsTool";
 import RouletteTool from "./pages/tools/RouletteTool";
 import ImageGenTool from "./pages/tools/ImageGenTool";
+import HashtagTool from "./pages/tools/HashtagTool";
+import BioTool from "./pages/tools/BioTool";
+import RepurposeTool from "./pages/tools/RepurposeTool";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +65,9 @@ function AppRoutes() {
           <Route path="/tools/reels" element={<ReelsTool />} />
           <Route path="/tools/roulette" element={<RouletteTool />} />
           <Route path="/tools/image-gen" element={<ImageGenTool />} />
+          <Route path="/tools/hashtags" element={<HashtagTool />} />
+          <Route path="/tools/bio" element={<BioTool />} />
+          <Route path="/tools/repurpose" element={<RepurposeTool />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

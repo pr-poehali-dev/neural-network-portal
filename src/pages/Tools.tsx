@@ -102,6 +102,31 @@ const TOOLS = [
     color: "from-rose-500/20 to-orange-500/20 border-rose-500/20",
     hint: "Нажми — получи идею для крутого фото",
   },
+  {
+    icon: "Hash",
+    label: "Хэштег-анализатор",
+    desc: "30 хэштегов по частотности: высокие, средние, нишевые",
+    href: "/tools/hashtags",
+    color: "from-sky-500/20 to-blue-500/20 border-sky-500/20",
+    free: true,
+    hint: "Укажи тему — получи готовые хэштеги",
+  },
+  {
+    icon: "UserCircle",
+    label: "Шапка профиля",
+    desc: "3 варианта bio для Instagram, TikTok, VK, Telegram",
+    href: "/tools/bio",
+    color: "from-emerald-500/20 to-green-500/20 border-emerald-500/20",
+    hint: "Ниша + ключевые слова = идеальная шапка",
+  },
+  {
+    icon: "RefreshCw",
+    label: "Переупаковщик контента",
+    desc: "Один текст → пост, карусель, сторис, email, тред",
+    href: "/tools/repurpose",
+    color: "from-amber-500/20 to-yellow-500/20 border-amber-500/20",
+    hint: "Вставь текст и выбери нужные форматы",
+  },
 ];
 
 export default function Tools() {

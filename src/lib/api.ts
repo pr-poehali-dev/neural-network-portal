@@ -112,11 +112,11 @@ export const generateApi = {
       body: JSON.stringify({ action: "image-edit", image_base64, prompt, size }),
     }),
 
-  post: (topic: string, platform: string, tone: string) =>
+  post: (topic: string, platform: string, tone: string, length: string, language: string, emoji_style: string) =>
     request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ action: "post", topic, platform, tone }),
+      body: JSON.stringify({ action: "post", topic, platform, tone, length, language, emoji_style }),
     }),
 
   scenario: (topic: string, platform: string, duration: string) =>
@@ -195,6 +195,27 @@ export const generateApi = {
       headers: authHeaders(),
       body: JSON.stringify({ action: "reels-analysis", video_description, views, likes, comments }),
     }),
+
+  hashtags: (topic: string, platform: string) =>
+    request<{ high: string[]; medium: string[]; low: string[]; all: string[] }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "hashtags", topic, platform }),
+    }, 30000),
+
+  bioGenerator: (niche: string, keywords: string, contact: string, platform: string, tone: string) =>
+    request<{ variants: string[] }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "bio-generator", niche, keywords, contact, platform, tone }),
+    }, 30000),
+
+  repurpose: (text: string, formats: string[]) =>
+    request<{ results: Record<string, string> }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "repurpose", text, formats }),
+    }, 60000),
 };
 
 export const paymentsApi = {
@@ -361,4 +382,11 @@ export interface AdminUser {
   free_carousel_generations: number;
   created_at: string;
   subscription: string | null;
+}
+
+export interface HashtagResult {
+  high: string[];
+  medium: string[];
+  low: string[];
+  all: string[];
 }

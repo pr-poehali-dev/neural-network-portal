@@ -343,10 +343,103 @@ def handler(event: dict, context) -> dict:
         topic = body.get("topic", "")
         platform = body.get("platform", "Instagram")
         tone = body.get("tone", "вовлекающий")
-        system = "Ты — профессиональный копирайтер для социальных сетей. Пиши на русском языке."
-        prompt = f"Напиши продающий пост для {platform} на тему: '{topic}'. Тон: {tone}. Добавь эмодзи, хэштеги и призыв к действию."
+        length = body.get("length", "Средний")
+        language = body.get("language", "Русский")
+        emoji_style = body.get("emoji_style", "Умеренно")
+
+        length_map = {"Короткий": "до 500 символов", "Средний": "500-1000 символов", "Длинный": "1000-2000 символов"}
+        emoji_map = {"Много эмодзи 🔥": "используй много эмодзи в каждом предложении", "Умеренно": "используй эмодзи умеренно", "Без эмодзи": "без эмодзи вообще"}
+        lang_instruction = "Пиши на английском языке." if language == "English" else "Пиши на русском языке."
+
+        system = f"Ты — профессиональный копирайтер для социальных сетей. {lang_instruction}"
+        prompt = (
+            f"Напиши {tone} пост для {platform} на тему: '{topic}'.\n"
+            f"Длина: {length_map.get(length, '500-1000 символов')}.\n"
+            f"Эмодзи: {emoji_map.get(emoji_style, 'умеренно')}.\n"
+            f"Добавь хэштеги и призыв к действию."
+        )
         result = generate_text_with_openrouter(prompt, system)
         return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "post"})}
+
+    elif action == "hashtags":
+        topic = body.get("topic", "")
+        platform = body.get("platform", "Instagram")
+        if not topic:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите тему"})}
+        system = "Ты — эксперт по SMM и хэштегам. Отвечай ТОЛЬКО валидным JSON без markdown."
+        prompt = (
+            f"Подбери 30 хэштегов для {platform} по теме: '{topic}'.\n"
+            f"Раздели на три группы по частотности:\n"
+            f"- high: 10 высокочастотных (миллионы публикаций)\n"
+            f"- medium: 10 среднечастотных (100к-1млн публикаций)\n"
+            f"- low: 10 низкочастотных (до 100к, нишевые)\n"
+            f"Верни JSON: {{\"high\": [...], \"medium\": [...], \"low\": [...]}}\n"
+            f"Хэштеги с # в начале, на русском или английском (как принято в нише)."
+        )
+        raw = generate_text_with_openrouter(prompt, system)
+        try:
+            clean = raw.strip()
+            if clean.startswith("```"):
+                parts = clean.split("```")
+                clean = parts[1] if len(parts) > 1 else clean
+                if clean.startswith("json"): clean = clean[4:]
+                clean = clean.strip()
+            data_h = json.loads(clean)
+            all_tags = data_h.get("high", []) + data_h.get("medium", []) + data_h.get("low", [])
+            data_h["all"] = all_tags
+            return {"statusCode": 200, "headers": headers, "body": json.dumps(data_h)}
+        except Exception:
+            return {"statusCode": 200, "headers": headers, "body": json.dumps({"high": [], "medium": [], "low": [], "all": [], "raw": raw})}
+
+    elif action == "bio-generator":
+        niche = body.get("niche", "")
+        keywords = body.get("keywords", "")
+        contact = body.get("contact", "")
+        platform = body.get("platform", "Instagram")
+        tone = body.get("tone", "экспертный")
+        if not niche:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите нишу"})}
+        contact_str = f"Контакт/ссылка: {contact}." if contact else ""
+        system = "Ты — эксперт по личному брендингу в соцсетях. Отвечай ТОЛЬКО валидным JSON без markdown."
+        prompt = (
+            f"Создай 3 варианта шапки профиля для {platform}.\n"
+            f"Ниша: {niche}. Ключевые слова: {keywords}. {contact_str} Тон: {tone}.\n"
+            f"Каждый вариант: 2-4 строки, эмодзи, конкретная польза для подписчика.\n"
+            f"Учти лимит символов {platform}: Instagram 150 симв, TikTok 80 симв, Telegram 70 симв, VK 200 симв.\n"
+            f"Верни JSON: {{\"variants\": [\"вариант 1\", \"вариант 2\", \"вариант 3\"]}}"
+        )
+        raw = generate_text_with_openrouter(prompt, system)
+        try:
+            clean = raw.strip()
+            if clean.startswith("```"):
+                parts = clean.split("```")
+                clean = parts[1] if len(parts) > 1 else clean
+                if clean.startswith("json"): clean = clean[4:]
+                clean = clean.strip()
+            data_b = json.loads(clean)
+            return {"statusCode": 200, "headers": headers, "body": json.dumps(data_b)}
+        except Exception:
+            return {"statusCode": 200, "headers": headers, "body": json.dumps({"variants": [raw]})}
+
+    elif action == "repurpose":
+        text = body.get("text", "")
+        formats = body.get("formats", [])
+        if not text or not formats:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите текст и форматы"})}
+        results = {}
+        format_prompts = {
+            "Пост Instagram": f"Переупакуй этот текст в продающий пост для Instagram (до 1000 символов, эмодзи, хэштеги, призыв к действию):\n\n{text}",
+            "Карусель": f"Переупакуй этот текст в структуру карусели для Instagram (5-7 слайдов, для каждого: заголовок + 2-3 тезиса):\n\n{text}",
+            "Сторис": f"Переупакуй этот текст в 3 части для сторис (каждая часть — 1-2 предложения, клиффхэнгер между частями):\n\n{text}",
+            "Email-рассылка": f"Переупакуй этот текст в email-рассылку (тема письма, приветствие, основной текст, призыв к действию, подпись):\n\n{text}",
+            "Заголовок для Дзена": f"Придумай 5 цепляющих заголовков для Яндекс Дзена на основе этого текста (с числами, вопросами, интригой):\n\n{text}",
+            "Thread для Telegram": f"Переупакуй этот текст в тред для Telegram (5-7 коротких сообщений пронумерованных 1/7, 2/7 и т.д.):\n\n{text}",
+        }
+        system = "Ты — профессиональный контент-маркетолог. Пиши на русском языке, адаптируй контент под формат."
+        for fmt in formats:
+            if fmt in format_prompts:
+                results[fmt] = generate_text_with_openrouter(format_prompts[fmt], system)
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"results": results})}
 
     elif action == "scenario":
         topic = body.get("topic", "")
