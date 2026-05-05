@@ -82,6 +82,20 @@ export const generateApi = {
   roulette: () =>
     request<{ prompt: string }>(`${GENERATE_URL}/roulette`, { headers: authHeaders() }),
 
+  imageGen: (prompt: string, style: string) =>
+    request<{ image_url: string; prompt: string }>(`${GENERATE_URL}/image-gen`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ prompt, style }),
+    }),
+
+  imageEdit: (image_base64: string, prompt: string) =>
+    request<{ image_url: string; prompt: string }>(`${GENERATE_URL}/image-edit`, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ image_base64, prompt }),
+    }),
+
   post: (topic: string, platform: string, tone: string) =>
     request<{ result: string; type: string }>(`${GENERATE_URL}/post`, {
       method: "POST",

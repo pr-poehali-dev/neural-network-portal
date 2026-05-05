@@ -4,6 +4,9 @@ import psycopg2
 import urllib.request
 import urllib.error
 import random
+import base64
+import uuid
+import boto3
 
 SCHEMA = "t_p97689468_neural_network_porta"
 
@@ -38,15 +41,55 @@ def get_user_by_token(cur, token):
     )
     return cur.fetchone()
 
-def call_huggingface(prompt: str, model: str = "stabilityai/stable-diffusion-xl-base-1.0") -> bytes:
+def get_s3():
+    return boto3.client(
+        "s3",
+        endpoint_url="https://bucket.poehali.dev",
+        aws_access_key_id=os.environ["AWS_ACCESS_KEY_ID"],
+        aws_secret_access_key=os.environ["AWS_SECRET_ACCESS_KEY"],
+    )
+
+def upload_image_to_s3(image_bytes: bytes, prefix: str = "generated") -> str:
+    s3 = get_s3()
+    key = f"images/{prefix}/{uuid.uuid4()}.png"
+    s3.put_object(Bucket="files", Key=key, Body=image_bytes, ContentType="image/png")
+    access_key = os.environ["AWS_ACCESS_KEY_ID"]
+    return f"https://cdn.poehali.dev/projects/{access_key}/bucket/{key}"
+
+def call_huggingface_txt2img(prompt: str) -> bytes:
     hf_token = os.environ.get("HUGGINGFACE_TOKEN", "")
+    model = "stabilityai/stable-diffusion-xl-base-1.0"
     url = f"https://api-inference.huggingface.co/models/{model}"
-    payload = json.dumps({"inputs": prompt}).encode()
+    payload = json.dumps({
+        "inputs": prompt,
+        "parameters": {"num_inference_steps": 30, "guidance_scale": 7.5}
+    }).encode()
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Content-Type", "application/json")
     if hf_token:
         req.add_header("Authorization", f"Bearer {hf_token}")
-    with urllib.request.urlopen(req, timeout=60) as resp:
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return resp.read()
+
+def call_huggingface_img2img(image_bytes: bytes, prompt: str) -> bytes:
+    hf_token = os.environ.get("HUGGINGFACE_TOKEN", "")
+    model = "timbrooks/instruct-pix2pix"
+    url = f"https://api-inference.huggingface.co/models/{model}"
+    image_b64 = base64.b64encode(image_bytes).decode()
+    payload = json.dumps({
+        "inputs": prompt,
+        "parameters": {
+            "image": image_b64,
+            "num_inference_steps": 20,
+            "image_guidance_scale": 1.5,
+            "guidance_scale": 7.0
+        }
+    }).encode()
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Content-Type", "application/json")
+    if hf_token:
+        req.add_header("Authorization", f"Bearer {hf_token}")
+    with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
@@ -78,7 +121,7 @@ def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
         return data["choices"][0]["message"]["content"]
 
 def handler(event: dict, context) -> dict:
-    """Генерация контента: изображения, тексты, карусели, сценарии, контент-планы"""
+    """Генерация контента: изображения по промту, редактирование фото, тексты, карусели, сценарии"""
     headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -107,11 +150,51 @@ def handler(event: dict, context) -> dict:
 
     action = path.split("/")[-1]
 
-    if action == "post":
+    if action == "image-gen":
+        prompt = body.get("prompt", "")
+        style = body.get("style", "")
+        if not prompt:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите описание изображения"})}
+
+        full_prompt = f"{prompt}, {style}" if style else prompt
+        full_prompt += ", high quality, 8k, photorealistic"
+
+        try:
+            image_bytes = call_huggingface_txt2img(full_prompt)
+            cdn_url = upload_image_to_s3(image_bytes, prefix="generated")
+            return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": full_prompt})}
+        except Exception as e:
+            error_msg = str(e)
+            if "503" in error_msg or "loading" in error_msg.lower():
+                return {"statusCode": 503, "headers": headers, "body": json.dumps({"error": "Модель загружается, попробуйте через 30 секунд"})}
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Ошибка генерации: {error_msg}"})}
+
+    elif action == "image-edit":
+        prompt = body.get("prompt", "")
+        image_b64 = body.get("image_base64", "")
+        if not prompt or not image_b64:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите изображение и описание изменений"})}
+
+        try:
+            image_bytes = base64.b64decode(image_b64)
+        except Exception:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
+
+        try:
+            result_bytes = call_huggingface_img2img(image_bytes, prompt)
+            cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
+            return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
+        except Exception as e:
+            error_msg = str(e)
+            if "503" in error_msg or "loading" in error_msg.lower():
+                return {"statusCode": 503, "headers": headers, "body": json.dumps({"error": "Модель загружается, попробуйте через 30 секунд"})}
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Ошибка редактирования: {error_msg}"})}
+
+    elif action == "post":
         topic = body.get("topic", "")
         platform = body.get("platform", "Instagram")
         tone = body.get("tone", "вовлекающий")
-        system = f"Ты — профессиональный копирайтер для социальных сетей. Пиши на русском языке."
+        system = "Ты — профессиональный копирайтер для социальных сетей. Пиши на русском языке."
         prompt = f"Напиши продающий пост для {platform} на тему: '{topic}'. Тон: {tone}. Добавь эмодзи, хэштеги и призыв к действию."
         result = generate_text_with_openrouter(prompt, system)
         return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "post"})}
@@ -143,7 +226,6 @@ def handler(event: dict, context) -> dict:
         return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "carousel"})}
 
     elif action == "profile-analysis":
-        profile_url = body.get("profile_url", "")
         niche = body.get("niche", "")
         followers = body.get("followers", 0)
         avg_likes = body.get("avg_likes", 0)
@@ -165,15 +247,15 @@ def handler(event: dict, context) -> dict:
         topic = body.get("topic", "")
         slides_count = body.get("slides_count", 10)
         system = "Ты — профессиональный презентационный дизайнер и копирайтер. Пиши на русском языке."
-        prompt = f"Создай структуру презентации из {slides_count} слайдов на тему: '{topic}'. Для каждого слайда: заголовок, ключевые тезисы (до 3 штук), рекомендация по визуализации."
+        prompt = f"Создай структуру презентации из {slides_count} слайдов на тему: '{topic}'. Для каждого слайда: заголовок, ключевые тезисы (до 3), визуальное описание. Первый слайд — обложка."
         result = generate_text_with_openrouter(prompt, system)
         return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "presentation"})}
 
     elif action == "guide":
         topic = body.get("topic", "")
-        guide_type = body.get("guide_type", "гайд")
-        system = "Ты — эксперт по созданию образовательного контента. Пиши на русском языке."
-        prompt = f"Создай подробный {guide_type} на тему: '{topic}'. Структура должна быть красивой, с разделами, подразделами, чеклистами и практическими советами. Добавь введение и заключение."
+        guide_type = body.get("guide_type", "пошаговый")
+        system = "Ты — эксперт-методолог. Пиши на русском языке."
+        prompt = f"Создай {guide_type} гайд на тему: '{topic}'. Структура: введение, пошаговые инструкции с деталями, советы, частые ошибки, заключение."
         result = generate_text_with_openrouter(prompt, system)
         return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "guide"})}
 
@@ -181,7 +263,7 @@ def handler(event: dict, context) -> dict:
         product_name = body.get("product_name", "")
         features = body.get("features", "")
         price = body.get("price", "")
-        system = "Ты — эксперт по маркетплейсам и продающим текстам. Пиши на русском языке."
+        system = "Ты — маркетолог маркетплейсов. Пиши на русском языке."
         prompt = f"Создай продающую карточку товара для маркетплейса: '{product_name}', характеристики: {features}, цена: {price}. Напиши: заголовок (с ключевыми словами), описание, bullet-points с преимуществами, SEO-теги."
         result = generate_text_with_openrouter(prompt, system)
         return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "product_card"})}

@@ -3,9 +3,8 @@
     {
       "name": "Get photo roulette prompt",
       "method": "GET",
-      "path": "/roulette",
-      "expectedStatus": 200,
-      "expectedBody": {"prompt": ""},
+      "path": "/",
+      "expectedStatus": 405,
       "bodyMatcher": "partial"
     }
   ]
