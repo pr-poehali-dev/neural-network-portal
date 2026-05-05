@@ -207,12 +207,77 @@ export default function ContentPlanTool() {
       });
     });
 
-    ws3["!ref"] = `A1:J${planRows.length + 1}`;
+    // Строка итогов
+    const lastDataRow = planRows.length + 1;
+    const sumRow = lastDataRow + 1;
+    const totalStyle = {
+      font: { bold: true, sz: 10, color: { rgb: "FFFFFF" } },
+      fill: { fgColor: { rgb: "4f46e5" } },
+      alignment: { horizontal: "center", vertical: "center" },
+      border: {
+        top:    { style: "medium", color: { rgb: "4f46e5" } },
+        bottom: { style: "medium", color: { rgb: "4f46e5" } },
+        left:   { style: "thin",   color: { rgb: "4f46e5" } },
+        right:  { style: "thin",   color: { rgb: "4f46e5" } },
+      },
+    };
+    const avgStyle = {
+      ...totalStyle,
+      fill: { fgColor: { rgb: "7c3aed" } },
+    };
+
+    // Сумма
+    setCellWithStyle(ws3, `A${sumRow}`, "ИТОГО", totalStyle);
+    setCellWithStyle(ws3, `B${sumRow}`, `${planRows.length} постов`, totalStyle);
+    setCellWithStyle(ws3, `C${sumRow}`, "", totalStyle);
+    setCellWithStyle(ws3, `D${sumRow}`, "", totalStyle);
+    const sumCols = ["E", "F", "G", "H", "I"];
+    sumCols.forEach(col => {
+      ws3[`${col}${sumRow}`] = {
+        t: "n", v: 0,
+        f: `SUM(${col}2:${col}${lastDataRow})`,
+        s: totalStyle,
+      };
+    });
+    setCellWithStyle(ws3, `J${sumRow}`, "Сумма ↑", totalStyle);
+
+    // Среднее
+    const avgRow = sumRow + 1;
+    setCellWithStyle(ws3, `A${avgRow}`, "СРЕДНЕЕ", avgStyle);
+    setCellWithStyle(ws3, `B${avgRow}`, "на 1 пост", avgStyle);
+    setCellWithStyle(ws3, `C${avgRow}`, "", avgStyle);
+    setCellWithStyle(ws3, `D${avgRow}`, "", avgStyle);
+    sumCols.forEach(col => {
+      ws3[`${col}${avgRow}`] = {
+        t: "n", v: 0,
+        f: `IFERROR(AVERAGE(${col}2:${col}${lastDataRow}),0)`,
+        s: { ...avgStyle, numFmt: "0.0" },
+      };
+    });
+    setCellWithStyle(ws3, `J${avgRow}`, "Среднее ↑", avgStyle);
+
+    // Лучший пост (макс просмотры)
+    const bestRow = avgRow + 1;
+    const bestStyle = {
+      ...totalStyle,
+      fill: { fgColor: { rgb: "059669" } },
+    };
+    setCellWithStyle(ws3, `A${bestRow}`, "ЛУЧШИЙ", bestStyle);
+    ws3[`E${bestRow}`] = {
+      t: "n", v: 0,
+      f: `MAX(E2:E${lastDataRow})`,
+      s: bestStyle,
+    };
+    ["B", "C", "D", "F", "G", "H", "I", "J"].forEach(col => {
+      setCellWithStyle(ws3, `${col}${bestRow}`, col === "J" ? "Макс просмотры ↑" : "", bestStyle);
+    });
+
+    ws3["!ref"] = `A1:J${bestRow}`;
     ws3["!cols"] = [
       { wch: 8 }, { wch: 35 }, { wch: 12 }, { wch: 12 },
-      { wch: 12 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 30 },
+      { wch: 13 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 10 }, { wch: 18 },
     ];
-    ws3["!rows"] = [{ hpt: 24 }, ...Array(planRows.length).fill({ hpt: 30 })];
+    ws3["!rows"] = [{ hpt: 24 }, ...Array(planRows.length).fill({ hpt: 30 }), { hpt: 22 }, { hpt: 22 }, { hpt: 22 }];
     XLSX.utils.book_append_sheet(wb, ws3, "📊 Аналитика");
 
     XLSX.writeFile(wb, `контент-план-${niche.slice(0, 20)}.xlsx`);
