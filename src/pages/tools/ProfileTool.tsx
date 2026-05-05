@@ -23,7 +23,7 @@ export default function ProfileTool() {
     try {
       const data = await generateApi.profileAnalysis(niche, Number(followers) || 0, Number(avgLikes) || 0);
       setResult(data.result);
-      await toolsApi.saveGeneration("profile", niche, undefined, { followers, avg_likes: avgLikes });
+      await toolsApi.saveGeneration("profile", niche, undefined, { followers, avg_likes: avgLikes, result });
       toast.success("Анализ готов!");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Ошибка генерации");

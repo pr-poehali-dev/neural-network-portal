@@ -26,7 +26,7 @@ export default function PostTool() {
     try {
       const data = await generateApi.post(topic, platform, tone);
       setResult(data.result);
-      await toolsApi.saveGeneration("post", topic, undefined, { platform, tone });
+      await toolsApi.saveGeneration("post", topic, undefined, { platform, tone, result });
       toast.success("Пост готов!");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Ошибка генерации");

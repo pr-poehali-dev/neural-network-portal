@@ -26,7 +26,7 @@ export default function ScenarioTool() {
     try {
       const data = await generateApi.scenario(topic, platform, duration);
       setResult(data.result);
-      await toolsApi.saveGeneration("scenario", topic, undefined, { platform, duration });
+      await toolsApi.saveGeneration("scenario", topic, undefined, { platform, duration, result });
       toast.success("Сценарий готов!");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Ошибка генерации");

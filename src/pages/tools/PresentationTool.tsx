@@ -22,7 +22,7 @@ export default function PresentationTool() {
     try {
       const data = await generateApi.presentation(topic, slidesCount);
       setResult(data.result);
-      await toolsApi.saveGeneration("presentation", topic, undefined, { slides_count: slidesCount });
+      await toolsApi.saveGeneration("presentation", topic, undefined, { slides_count: slidesCount, result });
       toast.success("Презентация готова!");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Ошибка генерации");

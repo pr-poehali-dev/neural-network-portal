@@ -23,7 +23,7 @@ export default function ProductCardTool() {
     try {
       const data = await generateApi.productCard(productName, features, price);
       setResult(data.result);
-      await toolsApi.saveGeneration("product-card", productName, undefined, { features, price });
+      await toolsApi.saveGeneration("product-card", productName, undefined, { features, price, result });
       toast.success("Карточка товара готова!");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Ошибка генерации");

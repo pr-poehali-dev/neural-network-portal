@@ -22,7 +22,7 @@ export default function CarouselTool() {
     try {
       const data = await generateApi.carousel(topic, slidesCount);
       setResult(data.result);
-      await toolsApi.saveGeneration("carousel", topic, undefined, { slides_count: slidesCount });
+      await toolsApi.saveGeneration("carousel", topic, undefined, { slides_count: slidesCount, result });
       toast.success("Карусель готова!");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Ошибка генерации");

@@ -24,7 +24,7 @@ export default function GuideTool() {
     try {
       const data = await generateApi.guide(topic, guideType);
       setResult(data.result);
-      await toolsApi.saveGeneration("guide", topic, undefined, { guide_type: guideType });
+      await toolsApi.saveGeneration("guide", topic, undefined, { guide_type: guideType, result });
       toast.success("Документ готов!");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Ошибка генерации");

@@ -24,7 +24,7 @@ export default function ReelsTool() {
     try {
       const data = await generateApi.reelsAnalysis(description, Number(views) || 0, Number(likes) || 0, Number(comments) || 0);
       setResult(data.result);
-      await toolsApi.saveGeneration("reels", description, undefined, { views, likes, comments });
+      await toolsApi.saveGeneration("reels", description, undefined, { views, likes, comments, result });
       toast.success("Анализ готов!");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Ошибка генерации");

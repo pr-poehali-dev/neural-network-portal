@@ -25,7 +25,7 @@ export default function FunnelTool() {
     try {
       const data = await generateApi.funnel(platform, product, audience);
       setResult(data.result);
-      await toolsApi.saveGeneration("funnel", product, undefined, { platform, audience });
+      await toolsApi.saveGeneration("funnel", product, undefined, { platform, audience, result });
       toast.success("Воронка готова!");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Ошибка генерации");
