@@ -3,7 +3,7 @@ import { Navigate, Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Icon from "@/components/ui/icon";
 import { useAuth } from "@/hooks/useAuth";
-import { toolsApi, Generation } from "@/lib/api";
+import { toolsApi, paymentsApi, Generation, PaymentRecord } from "@/lib/api";
 import { toast } from "sonner";
 
 const TOOL_LABELS: Record<string, string> = {
@@ -17,14 +17,19 @@ const TOOL_LABELS: Record<string, string> = {
 export default function Profile() {
   const { user, loading } = useAuth();
   const [generations, setGenerations] = useState<Generation[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [genLoading, setGenLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState<"generations" | "payments">("generations");
 
   useEffect(() => {
     if (user) {
       toolsApi.myGenerations()
         .then((d) => setGenerations(d.generations))
         .finally(() => setGenLoading(false));
+      paymentsApi.history()
+        .then((d) => setPayments(d.payments))
+        .catch(() => {});
     }
   }, [user]);
 
@@ -126,36 +131,79 @@ export default function Profile() {
         </div>
 
         <div className="glass rounded-xl border border-white/5 overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/5">
-            <h2 className="text-white font-medium">История генераций</h2>
+          <div className="px-5 py-4 border-b border-white/5 flex gap-4">
+            <button
+              onClick={() => setActiveTab("generations")}
+              className={`text-sm font-medium transition-colors ${activeTab === "generations" ? "text-primary" : "text-white/40 hover:text-white"}`}
+            >
+              История генераций
+            </button>
+            <button
+              onClick={() => setActiveTab("payments")}
+              className={`text-sm font-medium transition-colors ${activeTab === "payments" ? "text-primary" : "text-white/40 hover:text-white"}`}
+            >
+              Платежи {payments.length > 0 && <span className="ml-1 text-xs bg-white/10 px-1.5 py-0.5 rounded">{payments.length}</span>}
+            </button>
           </div>
-          {genLoading ? (
-            <div className="p-8 text-center text-white/30">
-              <Icon name="Loader2" size={20} className="animate-spin mx-auto mb-2" />
-              <p className="text-sm">Загрузка...</p>
-            </div>
-          ) : generations.length === 0 ? (
-            <div className="p-8 text-center text-white/25">
-              <Icon name="History" size={32} className="mx-auto mb-3 opacity-30" />
-              <p className="text-sm">Пока нет генераций. Попробуй один из инструментов!</p>
-              <Link to="/tools" className="text-primary text-sm hover:text-primary/80 mt-2 inline-block">Перейти к инструментам →</Link>
-            </div>
-          ) : (
-            <div className="divide-y divide-white/5">
-              {generations.slice(0, 20).map((g) => (
-                <div key={g.id} className="px-5 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="tag-pill bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] flex-shrink-0">
-                      {TOOL_LABELS[g.tool_slug] || g.tool_slug}
+
+          {activeTab === "generations" && (
+            genLoading ? (
+              <div className="p-8 text-center text-white/30">
+                <Icon name="Loader2" size={20} className="animate-spin mx-auto mb-2" />
+                <p className="text-sm">Загрузка...</p>
+              </div>
+            ) : generations.length === 0 ? (
+              <div className="p-8 text-center text-white/25">
+                <Icon name="History" size={32} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Пока нет генераций. Попробуй один из инструментов!</p>
+                <Link to="/tools" className="text-primary text-sm hover:text-primary/80 mt-2 inline-block">Перейти к инструментам →</Link>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {generations.slice(0, 20).map((g) => (
+                  <div key={g.id} className="px-5 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="tag-pill bg-primary/10 text-primary px-2 py-0.5 rounded text-[10px] flex-shrink-0">
+                        {TOOL_LABELS[g.tool_slug] || g.tool_slug}
+                      </span>
+                      <p className="text-sm text-white/50 truncate">{g.prompt}</p>
+                    </div>
+                    <span className="text-xs text-white/25 flex-shrink-0 ml-3">
+                      {new Date(g.created_at).toLocaleDateString("ru")}
                     </span>
-                    <p className="text-sm text-white/50 truncate">{g.prompt}</p>
                   </div>
-                  <span className="text-xs text-white/25 flex-shrink-0 ml-3">
-                    {new Date(g.created_at).toLocaleDateString("ru")}
-                  </span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )
+          )}
+
+          {activeTab === "payments" && (
+            payments.length === 0 ? (
+              <div className="p-8 text-center text-white/25">
+                <Icon name="CreditCard" size={32} className="mx-auto mb-3 opacity-30" />
+                <p className="text-sm">Платежей пока нет</p>
+                <Link to="/pricing" className="text-primary text-sm hover:text-primary/80 mt-2 inline-block">Выбрать тариф →</Link>
+              </div>
+            ) : (
+              <div className="divide-y divide-white/5">
+                {payments.map((p) => (
+                  <div key={p.id} className="px-5 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${p.status === "paid" ? "bg-green-400" : "bg-yellow-400"}`} />
+                      <div className="min-w-0">
+                        <p className="text-sm text-white/70">{p.plan_name}</p>
+                        <p className="text-xs text-white/30">
+                          {p.status === "paid" ? "Оплачен" : "Ожидает оплаты"} · {new Date(p.created_at).toLocaleDateString("ru-RU")}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-medium text-white/60 flex-shrink-0 ml-3">
+                      {p.amount.toLocaleString("ru-RU")} ₽
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </div>
       </div>

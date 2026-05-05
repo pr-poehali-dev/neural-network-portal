@@ -2,6 +2,7 @@ const AUTH_URL = "https://functions.poehali.dev/0bf7f72f-5b6f-44c6-89c5-e9b282e6
 const TOOLS_URL = "https://functions.poehali.dev/6432f493-1f71-41f5-a4b3-8cffeb9727d9";
 const GENERATE_URL = "https://functions.poehali.dev/2afb472b-a1f9-44b5-b6f8-161d23fe9db7";
 const ADMIN_URL = "https://functions.poehali.dev/d3e977ed-2750-4f12-8b84-a9a77ced73f5";
+const PAYMENTS_URL = "https://functions.poehali.dev/dc7471fd-d9dc-47aa-800e-2ea62214325d";
 
 function getToken(): string {
   return localStorage.getItem("auth_token") || "";
@@ -152,6 +153,33 @@ export const generateApi = {
     }),
 };
 
+export const paymentsApi = {
+  create: (plan_slug: string, single_tool_slug?: string) =>
+    request<{ payment_id?: string; confirmation_url?: string; amount: number; plan_name: string; demo?: boolean; message?: string }>(
+      `${PAYMENTS_URL}/create`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({
+          plan_slug,
+          single_tool_slug,
+          return_url: `${window.location.origin}/pricing?payment=success`,
+        }),
+      }
+    ),
+
+  status: (payment_id: string) =>
+    request<{ status: string; paid_at: string | null }>(
+      `${PAYMENTS_URL}/status?payment_id=${payment_id}`,
+      { headers: authHeaders() }
+    ),
+
+  history: () =>
+    request<{ payments: PaymentRecord[] }>(`${PAYMENTS_URL}/history`, {
+      headers: authHeaders(),
+    }),
+};
+
 export const adminApi = {
   stats: () =>
     request<AdminStats>(`${ADMIN_URL}/stats`, { headers: authHeaders() }),
@@ -250,6 +278,15 @@ export interface AdminStats {
   total_generations: number;
   total_referrals: number;
   new_users_week: number;
+}
+
+export interface PaymentRecord {
+  id: number;
+  plan_name: string;
+  amount: number;
+  status: string;
+  created_at: string;
+  paid_at: string | null;
 }
 
 export interface AdminUser {
