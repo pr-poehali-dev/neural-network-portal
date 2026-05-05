@@ -102,11 +102,11 @@ def call_cloudflare_img2img(image_bytes: bytes, prompt: str) -> bytes:
     img.thumbnail((512, 512), Image.LANCZOS)
     buf = io.BytesIO()
     img.save(buf, format="PNG")
-    image_b64 = base64.b64encode(buf.getvalue()).decode()
+    image_array = list(buf.getvalue())
 
     payload = json.dumps({
         "prompt": prompt,
-        "image": image_b64,
+        "image": image_array,
         "strength": 0.75,
         "num_steps": 20,
         "guidance": 7.5,
