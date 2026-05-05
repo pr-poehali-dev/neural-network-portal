@@ -58,14 +58,15 @@ def upload_image_to_s3(image_bytes: bytes, prefix: str = "generated") -> str:
 
 def call_huggingface_txt2img(prompt: str) -> bytes:
     hf_token = os.environ.get("HUGGINGFACE_TOKEN", "")
-    model = "stabilityai/stable-diffusion-xl-base-1.0"
+    model = "black-forest-labs/FLUX.1-schnell"
     url = f"https://api-inference.huggingface.co/models/{model}"
     payload = json.dumps({
         "inputs": prompt,
-        "parameters": {"num_inference_steps": 30, "guidance_scale": 7.5}
+        "parameters": {"num_inference_steps": 4, "guidance_scale": 0.0}
     }).encode()
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Content-Type", "application/json")
+    req.add_header("Accept", "image/png")
     if hf_token:
         req.add_header("Authorization", f"Bearer {hf_token}")
     with urllib.request.urlopen(req, timeout=120) as resp:
@@ -165,6 +166,7 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": full_prompt})}
         except Exception as e:
             error_msg = str(e)
+            print(f"[image-gen error] {error_msg}")
             if "503" in error_msg or "loading" in error_msg.lower():
                 return {"statusCode": 503, "headers": headers, "body": json.dumps({"error": "Модель загружается, попробуйте через 30 секунд"})}
             return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Ошибка генерации: {error_msg}"})}
