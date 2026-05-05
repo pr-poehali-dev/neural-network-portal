@@ -15,6 +15,7 @@ import Blog from "./pages/Blog";
 import Profile from "./pages/Profile";
 import Referral from "./pages/Referral";
 import Admin from "./pages/Admin";
+import AutoLogin from "./pages/AutoLogin";
 
 import PostTool from "./pages/tools/PostTool";
 import CarouselTool from "./pages/tools/CarouselTool";
@@ -47,6 +48,7 @@ function AppRoutes() {
           <Route path="/profile" element={<Profile />} />
           <Route path="/referral" element={<Referral />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/auto-login" element={<AutoLogin />} />
 
           <Route path="/tools/post" element={<PostTool />} />
           <Route path="/tools/carousel" element={<CarouselTool />} />

@@ -25,9 +25,24 @@ export function useAuthProvider(): AuthContextType {
 
   useEffect(() => {
     const token = localStorage.getItem("auth_token");
-    if (token) {
+    const cached = localStorage.getItem("auth_user");
+    if (token && cached) {
+      try {
+        setUser(JSON.parse(cached));
+      } catch (e) { console.warn(e); }
+      setLoading(false);
       authApi.me()
-        .then((data) => setUser(data.user))
+        .then((data) => {
+          setUser(data.user);
+          localStorage.setItem("auth_user", JSON.stringify(data.user));
+        })
+        .catch(() => {});
+    } else if (token) {
+      authApi.me()
+        .then((data) => {
+          setUser(data.user);
+          localStorage.setItem("auth_user", JSON.stringify(data.user));
+        })
         .catch(() => localStorage.removeItem("auth_token"))
         .finally(() => setLoading(false));
     } else {
@@ -38,17 +53,20 @@ export function useAuthProvider(): AuthContextType {
   const login = async (email: string, password: string) => {
     const data = await authApi.login(email, password);
     localStorage.setItem("auth_token", data.token);
+    localStorage.setItem("auth_user", JSON.stringify(data.user));
     setUser(data.user);
   };
 
   const register = async (email: string, password: string, name: string, ref_code?: string) => {
     const data = await authApi.register(email, password, name, ref_code);
     localStorage.setItem("auth_token", data.token);
+    localStorage.setItem("auth_user", JSON.stringify(data.user));
     setUser(data.user);
   };
 
   const logout = () => {
     localStorage.removeItem("auth_token");
+    localStorage.removeItem("auth_user");
     setUser(null);
   };
 
