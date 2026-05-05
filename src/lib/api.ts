@@ -140,6 +140,20 @@ export const generateApi = {
       body: JSON.stringify({ action: "carousel", topic, slides_count }),
     }),
 
+  carouselStructure: (topic: string, slides_count: number, ai_text: boolean) =>
+    request<{ slides: CarouselSlide[] }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "carousel-structure", topic, slides_count, ai_text }),
+    }, 60000),
+
+  carouselImage: (visual_prompt: string, style_prompt: string, slide_index: number, user_image_b64?: string) =>
+    request<{ image_url: string; slide_index: number }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "carousel-image", visual_prompt, style_prompt, slide_index, user_image_b64 }),
+    }, 120000),
+
   profileAnalysis: (niche: string, followers: number, avg_likes: number) =>
     request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",
@@ -292,6 +306,14 @@ export interface AiTool {
   is_featured: boolean;
   tags: string[];
   capabilities: string[];
+}
+
+export interface CarouselSlide {
+  slide: number;
+  title: string;
+  text: string;
+  visual_prompt: string;
+  image_url?: string;
 }
 
 export interface ContentPlanRow {

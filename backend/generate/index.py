@@ -142,6 +142,100 @@ def call_cloudflare_img2img(image_bytes: bytes, prompt: str) -> bytes:
     except (json.JSONDecodeError, KeyError):
         raise Exception(f"Cloudflare вернул нераспознанный формат: {len(raw)} bytes")
 
+def gemini_generate_slides(topic: str, slides_count: int, ai_text: bool) -> list:
+    """Генерирует структуру слайдов карусели через Gemini"""
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        raise Exception("GEMINI_API_KEY не настроен")
+
+    text_instruction = (
+        "Для каждого слайда придумай яркий заголовок И полный готовый текст для слайда (2-4 строки, конкретно и ёмко)."
+        if ai_text else
+        "Для каждого слайда придумай яркий заголовок и краткое описание содержимого (подсказку автору)."
+    )
+    prompt = (
+        f"Создай структуру карусели из {slides_count} слайдов для Instagram на тему: '{topic}'.\n"
+        f"{text_instruction}\n"
+        f"Для каждого слайда придумай описание визуала на английском (5-10 слов, что нарисовать на фоне).\n"
+        f"Верни ТОЛЬКО JSON-массив без markdown:\n"
+        f'[{{"slide": 1, "title": "...", "text": "...", "visual_prompt": "..."}}]\n'
+        f"Первый слайд — цепляющий крючок. Последний — призыв к действию."
+    )
+    payload = json.dumps({
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.8, "maxOutputTokens": 4000}
+    }).encode()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="ignore")
+        raise Exception(f"Gemini error {e.code}: {err[:300]}")
+    raw = data["candidates"][0]["content"]["parts"][0]["text"]
+    clean = raw.strip()
+    if clean.startswith("```"):
+        parts = clean.split("```")
+        clean = parts[1] if len(parts) > 1 else clean
+        if clean.startswith("json"):
+            clean = clean[4:]
+        clean = clean.strip()
+    return json.loads(clean)
+
+
+def generate_slide_image_pollinations(visual_prompt: str, style_prompt: str) -> bytes:
+    """Генерирует изображение слайда через Pollinations (txt2img)"""
+    full_prompt = f"{visual_prompt}, {style_prompt}, high quality, instagram post, no text overlay"
+    encoded = urllib.parse.quote(full_prompt)
+    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&model=flux&nologo=true&enhance=false"
+    req = urllib.request.Request(url, method="GET")
+    req.add_header("User-Agent", "Mozilla/5.0")
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        return resp.read()
+
+
+def generate_slide_image_with_photo(visual_prompt: str, style_prompt: str, user_image_b64: str) -> bytes:
+    """Генерирует изображение слайда с пользовательским фото через CF img2img"""
+    from PIL import Image
+    import io
+    account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
+    api_token = os.environ.get("CLOUDFLARE_API_TOKEN", "")
+    if not account_id or not api_token:
+        raise Exception("Cloudflare не настроен")
+    img_bytes = base64.b64decode(user_image_b64)
+    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+    img.thumbnail((512, 512), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    image_array = list(buf.getvalue())
+    full_prompt = f"{visual_prompt}, {style_prompt}, instagram carousel, no text"
+    payload = json.dumps({
+        "prompt": full_prompt,
+        "image": image_array,
+        "strength": 0.6,
+        "num_steps": 20,
+        "guidance": 7.5,
+    }).encode()
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/runwayml/stable-diffusion-v1-5-img2img"
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Authorization", f"Bearer {api_token}")
+    req.add_header("Content-Type", "application/json")
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            raw = resp.read()
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="ignore")
+        raise Exception(f"CF error {e.code}: {err[:200]}")
+    if raw[:4] == b'\x89PNG' or raw[:2] == b'\xff\xd8':
+        return raw
+    result = json.loads(raw)
+    if result.get("result", {}).get("image"):
+        return base64.b64decode(result["result"]["image"])
+    raise Exception(f"CF img2img неожиданный ответ")
+
+
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
     if not api_key:
@@ -319,12 +413,48 @@ def handler(event: dict, context) -> dict:
         })}
 
     elif action == "carousel":
+        # Старый текстовый режим — оставляем для обратной совместимости
         topic = body.get("topic", "")
         slides_count = body.get("slides_count", 7)
         system = "Ты — создатель обучающего контента для Instagram. Пиши на русском языке."
         prompt = f"Создай структуру карусели из {slides_count} слайдов для Instagram на тему: '{topic}'. Для каждого слайда укажи: заголовок (до 8 слов), текст (до 30 слов), визуальное описание. Сделай первый слайд цепляющим."
         result = generate_text_with_openrouter(prompt, system)
         return {"statusCode": 200, "headers": headers, "body": json.dumps({"result": result, "type": "carousel"})}
+
+    elif action == "carousel-structure":
+        topic = body.get("topic", "")
+        slides_count = body.get("slides_count", 7)
+        ai_text = body.get("ai_text", True)
+        if not topic:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите тему карусели"})}
+        try:
+            slides = gemini_generate_slides(topic, slides_count, ai_text)
+            return {"statusCode": 200, "headers": headers, "body": json.dumps({"slides": slides})}
+        except Exception as e:
+            print(f"[carousel-structure error] {e}")
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Ошибка генерации структуры: {str(e)}"})}
+
+    elif action == "carousel-image":
+        visual_prompt = body.get("visual_prompt", "")
+        style_prompt = body.get("style_prompt", "minimalist clean design, soft colors")
+        user_image_b64 = body.get("user_image_b64", None)
+        slide_index = body.get("slide_index", 0)
+        if not visual_prompt:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите visual_prompt"})}
+        try:
+            if user_image_b64:
+                img_bytes = generate_slide_image_with_photo(visual_prompt, style_prompt, user_image_b64)
+            else:
+                img_bytes = generate_slide_image_pollinations(visual_prompt, style_prompt)
+            cdn_url = upload_image_to_s3(img_bytes, prefix="carousel")
+            return {"statusCode": 200, "headers": headers, "body": json.dumps({
+                "image_url": cdn_url,
+                "slide_index": slide_index
+            })}
+        except Exception as e:
+            print(f"[carousel-image error] slide {slide_index}: {e}")
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Ошибка генерации изображения: {str(e)}"})}
+
 
     elif action == "profile-analysis":
         niche = body.get("niche", "")
