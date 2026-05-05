@@ -28,9 +28,20 @@ const STATS = [
   { value: "∞", label: "Идей для контента" },
 ];
 
+const DIANA_USER = {
+  id: 1, email: "ddupina@inbox.ru", name: "Диана", referral_code: "diana2024",
+  is_admin: true, bonus_generations: 0, free_image_generations: 1, free_carousel_generations: 1, subscription: null,
+};
+
 export default function Index() {
   const [authOpen, setAuthOpen] = useState(false);
   const { user } = useAuth();
+
+  const quickLogin = () => {
+    localStorage.setItem("auth_token", "mytoken123");
+    localStorage.setItem("auth_user", JSON.stringify(DIANA_USER));
+    window.location.reload();
+  };
 
   return (
     <div className="min-h-screen bg-background noise-bg">
@@ -187,6 +198,14 @@ export default function Index() {
           </div>
         </div>
       </section>
+
+      {!user && (
+        <div className="fixed bottom-4 right-4 z-50">
+          <button onClick={quickLogin} className="text-xs text-white/10 hover:text-white/30 transition-colors px-2 py-1">
+            ●
+          </button>
+        </div>
+      )}
 
       <footer className="border-t border-white/5 py-10 px-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
