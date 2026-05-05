@@ -81,11 +81,12 @@ def call_cloudflare_img2img(image_bytes: bytes, prompt: str) -> bytes:
     if not api_token:
         raise Exception("CLOUDFLARE_API_TOKEN не настроен")
 
-    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
+    # Cloudflare ожидает массив uint8 байт
+    image_array = list(image_bytes)
 
     payload = json.dumps({
         "prompt": prompt,
-        "image": image_b64,
+        "image": image_array,
         "strength": 0.75,
         "num_steps": 20,
         "guidance": 7.5,
