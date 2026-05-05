@@ -122,7 +122,7 @@ def call_openai_img2img(image_bytes: bytes, prompt: str) -> bytes:
         return b"\r\n".join(lines)
 
     body_parts = [
-        part("model", "gpt-image-1"),
+        part("model", "dall-e-2"),
         part("prompt", prompt),
         part("image", png_bytes, filename="image.png", content_type="image/png"),
         part("size", "1024x1024"),
