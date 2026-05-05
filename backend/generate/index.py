@@ -74,12 +74,26 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
+def resize_image(image_bytes: bytes, max_size: int = 768) -> bytes:
+    """Сжимает изображение до max_size по большей стороне через PIL"""
+    from PIL import Image
+    import io
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    w, h = img.size
+    if max(w, h) > max_size:
+        ratio = max_size / max(w, h)
+        img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
 def call_huggingface_img2img(image_bytes: bytes, prompt: str) -> bytes:
     """Редактирование фото через HuggingFace SDXL — высокое качество"""
     token = os.environ.get("HUGGINGFACE_TOKEN", "")
     if not token:
         raise Exception("HUGGINGFACE_TOKEN не настроен")
 
+    image_bytes = resize_image(image_bytes, max_size=768)
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
     payload = json.dumps({
