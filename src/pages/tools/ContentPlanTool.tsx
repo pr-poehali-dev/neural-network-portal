@@ -55,8 +55,27 @@ export default function ContentPlanTool() {
       const platformLabels = selectedPlatforms.map(id => SOCIAL_NETWORKS.find(s => s.id === id)?.label || id);
       const data = await generateApi.contentPlan(niche, period, goals, platformLabels);
       setRawResult(data.result);
-      if (data.rows && data.rows.length > 0) {
-        setRows(data.rows);
+
+      let parsedRows = data.rows;
+
+      // Если бэкенд не распарсил — пробуем на фронте
+      if (!parsedRows || parsedRows.length === 0) {
+        try {
+          let clean = data.result.trim();
+          if (clean.startsWith("```")) {
+            const parts = clean.split("```");
+            clean = parts[1] || clean;
+            if (clean.startsWith("json")) clean = clean.slice(4);
+            clean = clean.trim();
+          }
+          parsedRows = JSON.parse(clean);
+        } catch {
+          parsedRows = null;
+        }
+      }
+
+      if (parsedRows && parsedRows.length > 0) {
+        setRows(parsedRows);
       }
       await toolsApi.saveGeneration("content-plan", niche, undefined, { period, goals, platforms: platformLabels });
       toast.success("Контент-план готов!");
@@ -197,9 +216,30 @@ export default function ContentPlanTool() {
 
             {/* Fallback */}
             {!rows && rawResult && (
-              <div className="glass rounded-xl p-5 border border-white/5">
-                <p className="text-xs text-white/40 mb-2">Результат:</p>
-                <pre className="text-white/70 text-xs whitespace-pre-wrap leading-relaxed">{rawResult}</pre>
+              <div className="glass rounded-xl border border-white/5 overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                  <span className="text-sm font-medium text-white">Контент-план готов</span>
+                  <Button
+                    onClick={() => {
+                      const blob = new Blob([rawResult], { type: "text/plain;charset=utf-8" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = `контент-план-${niche.slice(0, 20)}.txt`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast.success("Файл скачан!");
+                    }}
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-500 text-white gap-2"
+                  >
+                    <Icon name="Download" size={14} />
+                    Скачать .txt
+                  </Button>
+                </div>
+                <div className="p-5">
+                  <pre className="text-white/70 text-xs whitespace-pre-wrap leading-relaxed">{rawResult}</pre>
+                </div>
               </div>
             )}
           </div>
