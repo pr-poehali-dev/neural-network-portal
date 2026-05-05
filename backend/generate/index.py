@@ -75,12 +75,10 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
         return resp.read()
 
 def call_stability_img2img(image_bytes: bytes, prompt: str, size: str = "square") -> bytes:
-    import urllib.parse, io
     api_key = os.environ.get("STABILITY_API_KEY", "")
     if not api_key:
         raise Exception("STABILITY_API_KEY не настроен")
 
-    w, h = SIZE_MAP.get(size, (1024, 1024))
     boundary = "----FormBoundary" + uuid.uuid4().hex
 
     def field(name, value):
@@ -99,8 +97,10 @@ def call_stability_img2img(image_bytes: bytes, prompt: str, size: str = "square"
 
     body = (
         field("prompt", prompt) +
+        field("mode", "image-to-image") +
+        field("model", "sd3-large-turbo") +
+        field("strength", "0.7") +
         field("output_format", "png") +
-        field("strength", "0.75") +
         file_field("image", "image.png", "image/png", image_bytes) +
         f"--{boundary}--\r\n".encode()
     )
@@ -113,8 +113,13 @@ def call_stability_img2img(image_bytes: bytes, prompt: str, size: str = "square"
     req.add_header("Accept", "image/*")
     req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
 
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return resp.read()
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="ignore")
+        print(f"[stability error] {e.code}: {err_body}")
+        raise Exception(f"Stability AI error {e.code}: {err_body}")
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
