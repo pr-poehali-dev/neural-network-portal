@@ -168,11 +168,11 @@ export const generateApi = {
       body: JSON.stringify({ action: "funnel", platform, product, audience }),
     }),
 
-  presentation: (topic: string, slides_count: number, theme: string) =>
+  presentation: (topic: string, slides_count: number, theme: string, custom_style: string) =>
     request<{ result: string; pptx_url?: string; slides_count?: number; type: string }>(GENERATE_URL, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ action: "presentation", topic, slides_count, theme }),
+      body: JSON.stringify({ action: "presentation", topic, slides_count, theme, custom_style }),
     }, 180000),
 
   guide: (topic: string, guide_type: string) =>

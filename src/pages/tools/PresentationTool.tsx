@@ -49,6 +49,7 @@ export default function PresentationTool() {
   const [topic, setTopic] = useState("");
   const [slidesCount, setSlidesCount] = useState(10);
   const [theme, setTheme] = useState("dark");
+  const [customStyle, setCustomStyle] = useState("");
   const [loading, setLoading] = useState(false);
   const [pptxUrl, setPptxUrl] = useState<string | null>(null);
   const [resultSlides, setResultSlides] = useState<number | null>(null);
@@ -62,7 +63,7 @@ export default function PresentationTool() {
     setPptxUrl(null);
     setResultSlides(null);
     try {
-      const data = await generateApi.presentation(topic, slidesCount, theme);
+      const data = await generateApi.presentation(topic, slidesCount, theme, customStyle);
       if (data.pptx_url) {
         setPptxUrl(data.pptx_url);
         setResultSlides(data.slides_count ?? slidesCount);
@@ -133,6 +134,26 @@ export default function PresentationTool() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Свой стиль картинок */}
+              <div>
+                <label className="text-sm text-white/60 mb-1.5 block">Стиль картинок (необязательно)</label>
+                <Input
+                  value={customStyle}
+                  onChange={(e) => setCustomStyle(e.target.value)}
+                  placeholder="Например: watercolor illustration, flat design vector, cinematic dark moody"
+                  className="bg-white/5 border-white/10 text-white placeholder:text-white/25"
+                />
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {["3D render Blender", "watercolor art", "flat vector illustration", "cinematic photography", "oil painting", "minimalist line art", "neon cyberpunk"].map(s => (
+                    <button key={s} onClick={() => setCustomStyle(s)}
+                      className={`px-2 py-0.5 text-[11px] rounded-md border transition-all ${customStyle === s ? "border-primary/60 bg-primary/10 text-primary" : "border-white/10 bg-white/5 text-white/40 hover:text-white"}`}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-white/20 mt-1.5">Описание стиля передаётся напрямую в нейросеть для генерации картинок</p>
               </div>
 
               <Button onClick={() => generate(onGenerate)} disabled={loading}

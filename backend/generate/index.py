@@ -482,15 +482,21 @@ def handler(event: dict, context) -> dict:
     elif action == "presentation":
         topic = body.get("topic", "")
         slides_count = body.get("slides_count", 10)
-        theme = body.get("theme", "dark")  # dark | light | corporate | creative | minimal
+        theme = body.get("theme", "dark")
+        custom_style = body.get("custom_style", "")  # пользовательский стиль картинок
 
         # 1. Генерируем структуру через OpenRouter
-        system = "Ты — профессиональный презентационный дизайнер. Отвечай ТОЛЬКО валидным JSON-массивом без markdown."
+        system = "Ты — профессиональный презентационный дизайнер и эксперт в теме. Отвечай ТОЛЬКО валидным JSON-массивом без markdown и пояснений."
         prompt = (
             f"Создай структуру презентации из {slides_count} слайдов на тему: '{topic}'.\n"
-            f"Для каждого слайда верни объект:\n"
-            f'{{"slide": 1, "title": "...", "bullets": ["тезис1","тезис2","тезис3"], "image_query": "english search query for background image 5-7 words"}}\n'
-            f"Первый слайд — обложка (bullets = подзаголовок). Последний — выводы/контакты. Только JSON-массив."
+            f"Для каждого слайда верни объект строго:\n"
+            f'{{"slide": 1, "title": "Заголовок слайда", "bullets": ["Развёрнутый тезис с конкретными данными или советом", "Второй тезис — практичный и понятный", "Третий тезис — итог или следующий шаг"], "image_query": "very specific english prompt for image generation matching slide topic, 8-12 words, photorealistic"}}\n\n'
+            f"Требования:\n"
+            f"- Первый слайд — красивая обложка, bullets[0] = краткий подзаголовок презентации\n"
+            f"- Последний слайд — выводы и призыв к действию\n"
+            f"- Каждый тезис — 1-2 предложения, конкретно, без воды, с пользой\n"
+            f"- image_query: ОЧЕНЬ конкретный запрос строго по теме этого слайда (не общий фон!). Например для слайда о SEO: 'SEO analytics dashboard computer screen data charts'\n"
+            f"- Только JSON-массив, без markdown."
         )
         raw = generate_text_with_openrouter(prompt, system)
         slides_data = None
@@ -553,11 +559,14 @@ def handler(event: dict, context) -> dict:
         def fetch_image(query: str) -> bytes | None:
             try:
                 import urllib.parse as _up
-                enc = _up.quote(query + " professional photography high quality")
-                url = f"https://image.pollinations.ai/prompt/{enc}?width=1920&height=1080&model=flux&nologo=true"
+                # Если пользователь задал свой стиль — добавляем его
+                style_suffix = f", {custom_style}" if custom_style else ", professional photography, high quality, sharp focus"
+                full_query = query + style_suffix
+                enc = _up.quote(full_query)
+                url = f"https://image.pollinations.ai/prompt/{enc}?width=1920&height=1080&model=flux&nologo=true&enhance=false"
                 req2 = urllib.request.Request(url, method="GET")
                 req2.add_header("User-Agent", "Mozilla/5.0")
-                with urllib.request.urlopen(req2, timeout=30) as r:
+                with urllib.request.urlopen(req2, timeout=45) as r:
                     return r.read()
             except Exception as ex:
                 print(f"[pptx img error] {ex}")
