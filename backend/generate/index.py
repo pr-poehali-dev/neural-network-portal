@@ -74,51 +74,44 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
-def call_cloudflare_img2img(image_bytes: bytes, prompt: str) -> bytes:
-    """Редактирование фото через Cloudflare Workers AI (img2img) — бесплатно 10k/день"""
-    account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
-    api_token = os.environ.get("CLOUDFLARE_API_TOKEN", "")
-    if not api_token:
-        raise Exception("CLOUDFLARE_API_TOKEN не настроен")
+def call_huggingface_img2img(image_bytes: bytes, prompt: str) -> bytes:
+    """Редактирование фото через HuggingFace SDXL — высокое качество"""
+    token = os.environ.get("HUGGINGFACE_TOKEN", "")
+    if not token:
+        raise Exception("HUGGINGFACE_TOKEN не настроен")
 
-    # Cloudflare ожидает массив uint8 байт
-    image_array = list(image_bytes)
+    image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
     payload = json.dumps({
-        "prompt": prompt,
-        "image": image_array,
-        "strength": 0.75,
-        "num_steps": 20,
-        "guidance": 7.5,
+        "inputs": prompt,
+        "parameters": {
+            "image": image_b64,
+            "strength": 0.6,
+            "guidance_scale": 7.5,
+            "num_inference_steps": 30,
+        }
     }).encode()
 
-    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/runwayml/stable-diffusion-v1-5-img2img"
+    url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-refiner-1.0"
     req = urllib.request.Request(url, data=payload, method="POST")
-    req.add_header("Authorization", f"Bearer {api_token}")
+    req.add_header("Authorization", f"Bearer {token}")
     req.add_header("Content-Type", "application/json")
 
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
             raw = resp.read()
-        # Cloudflare возвращает либо JSON с base64, либо сырые байты изображения
-        try:
-            result = json.loads(raw)
-            print(f"[cloudflare] json response keys: {list(result.keys())}")
-            if result.get("success") and result.get("result"):
-                r = result["result"]
-                if isinstance(r, str):
-                    return base64.b64decode(r)
-                if isinstance(r, dict) and "image" in r:
-                    return base64.b64decode(r["image"])
-            raise Exception(f"Неожиданный ответ: {str(result)[:300]}")
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            # Ответ — сырые байты PNG
-            print(f"[cloudflare] got raw image bytes: {len(raw)}")
+        # HuggingFace возвращает сырые байты изображения
+        if raw[:4] == b'\x89PNG' or raw[:2] == b'\xff\xd8':
+            print(f"[huggingface] got raw image: {len(raw)} bytes")
             return raw
+        # Или JSON с ошибкой
+        result = json.loads(raw)
+        print(f"[huggingface] json response: {str(result)[:300]}")
+        raise Exception(f"HuggingFace вернул JSON: {str(result)[:200]}")
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[cloudflare error] {e.code}: {err_body[:500]}")
-        raise Exception(f"Cloudflare AI error {e.code}: {err_body[:200]}")
+        print(f"[huggingface error] {e.code}: {err_body[:500]}")
+        raise Exception(f"HuggingFace error {e.code}: {err_body[:200]}")
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
@@ -210,7 +203,7 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
 
         try:
-            result_bytes = call_cloudflare_img2img(image_bytes, prompt)
+            result_bytes = call_huggingface_img2img(image_bytes, prompt)
             cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
         except Exception as e:
