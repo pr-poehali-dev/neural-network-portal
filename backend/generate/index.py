@@ -87,73 +87,58 @@ def resize_image(image_bytes: bytes, max_size: int = 512) -> bytes:
     img.save(buf, format="JPEG", quality=85)
     return buf.getvalue()
 
-def call_openai_img2img(image_bytes: bytes, prompt: str) -> bytes:
-    """Редактирование фото через OpenAI gpt-image-1 (image edit API)"""
+def call_cloudflare_img2img(image_bytes: bytes, prompt: str) -> bytes:
+    """Редактирование фото через Cloudflare Workers AI (flux-1-schnell-img2img)"""
     import io
     from PIL import Image
 
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    if not api_key:
-        raise Exception("OPENAI_API_KEY не настроен")
+    account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
+    api_token = os.environ.get("CLOUDFLARE_API_TOKEN", "")
+    if not account_id or not api_token:
+        raise Exception("CLOUDFLARE_ACCOUNT_ID или CLOUDFLARE_API_TOKEN не настроены")
 
-    # Конвертируем в PNG с прозрачностью (RGBA) — требование OpenAI
-    img = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
-    png_buf = io.BytesIO()
-    img.save(png_buf, format="PNG")
-    png_bytes = png_buf.getvalue()
+    # Сжимаем до 512x512 (лимит CF img2img)
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    img.thumbnail((512, 512), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    image_b64 = base64.b64encode(buf.getvalue()).decode()
 
-    # Multipart form-data вручную
-    boundary = "----FormBoundary" + uuid.uuid4().hex
+    payload = json.dumps({
+        "prompt": prompt,
+        "image": [{"role": "user", "content": image_b64}],
+        "strength": 0.75,
+        "num_steps": 20,
+        "guidance": 7.5,
+    }).encode()
 
-    def part(name, value, filename=None, content_type=None):
-        lines = []
-        disposition = f'Content-Disposition: form-data; name="{name}"'
-        if filename:
-            disposition += f'; filename="{filename}"'
-        lines.append(("--" + boundary).encode())
-        lines.append(disposition.encode())
-        if content_type:
-            lines.append(f"Content-Type: {content_type}".encode())
-        lines.append(b"")
-        if isinstance(value, str):
-            lines.append(value.encode())
-        else:
-            lines.append(value)
-        return b"\r\n".join(lines)
-
-    body_parts = [
-        part("model", "dall-e-2"),
-        part("prompt", prompt),
-        part("image", png_bytes, filename="image.png", content_type="image/png"),
-        part("size", "1024x1024"),
-        part("n", "1"),
-        part("response_format", "b64_json"),
-    ]
-    body_data = b"\r\n" + b"\r\n".join(body_parts) + b"\r\n" + ("--" + boundary + "--").encode()
-
-    req = urllib.request.Request(
-        "https://api.openai.com/v1/images/edits",
-        data=body_data,
-        method="POST"
-    )
-    req.add_header("Authorization", f"Bearer {api_key}")
-    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/black-forest-labs/flux-1-schnell"
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Authorization", f"Bearer {api_token}")
+    req.add_header("Content-Type", "application/json")
 
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
-            result = json.loads(resp.read())
+            raw = resp.read()
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="ignore")
-        print(f"[openai img2img] HTTP {e.code}: {err_body[:1000]}")
-        raise Exception(f"OpenAI HTTP {e.code}: {err_body[:300]}")
+        print(f"[cloudflare img2img] HTTP {e.code}: {err_body[:1000]}")
+        raise Exception(f"Cloudflare HTTP {e.code}: {err_body[:300]}")
 
-    print(f"[openai img2img] response keys: {list(result.keys())}")
-    b64_data = result["data"][0].get("b64_json") or result["data"][0].get("url")
-    if result["data"][0].get("b64_json"):
-        return base64.b64decode(b64_data)
-    else:
-        with urllib.request.urlopen(b64_data, timeout=60) as r:
-            return r.read()
+    # CF возвращает либо JSON с base64, либо сырые байты PNG
+    if raw[:4] == b'\x89PNG' or raw[:2] == b'\xff\xd8':
+        print(f"[cloudflare img2img] got raw image: {len(raw)} bytes")
+        return raw
+
+    result = json.loads(raw)
+    print(f"[cloudflare img2img] response: {str(result)[:300]}")
+
+    if result.get("success") and result.get("result"):
+        img_data = result["result"].get("image")
+        if img_data:
+            return base64.b64decode(img_data)
+
+    raise Exception(f"Cloudflare вернул неожиданный ответ: {str(result)[:200]}")
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
     api_key = os.environ.get("OPENROUTER_API_KEY", "")
@@ -245,7 +230,7 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
 
         try:
-            result_bytes = call_openai_img2img(image_bytes, prompt)
+            result_bytes = call_cloudflare_img2img(image_bytes, prompt)
             cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
         except Exception as e:
