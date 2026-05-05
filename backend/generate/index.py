@@ -74,7 +74,7 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
 
-def resize_image(image_bytes: bytes, max_size: int = 768) -> bytes:
+def resize_image(image_bytes: bytes, max_size: int = 512) -> bytes:
     """Сжимает изображение до max_size по большей стороне через PIL"""
     from PIL import Image
     import io
@@ -84,7 +84,7 @@ def resize_image(image_bytes: bytes, max_size: int = 768) -> bytes:
         ratio = max_size / max(w, h)
         img = img.resize((int(w * ratio), int(h * ratio)), Image.LANCZOS)
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
+    img.save(buf, format="JPEG", quality=85)
     return buf.getvalue()
 
 def call_huggingface_img2img(image_bytes: bytes, prompt: str) -> bytes:
@@ -93,7 +93,7 @@ def call_huggingface_img2img(image_bytes: bytes, prompt: str) -> bytes:
     if not token:
         raise Exception("HUGGINGFACE_TOKEN не настроен")
 
-    image_bytes = resize_image(image_bytes, max_size=768)
+    image_bytes = resize_image(image_bytes, max_size=512)
     image_b64 = base64.b64encode(image_bytes).decode("utf-8")
 
     payload = json.dumps({
@@ -102,7 +102,7 @@ def call_huggingface_img2img(image_bytes: bytes, prompt: str) -> bytes:
             "image": image_b64,
             "strength": 0.6,
             "guidance_scale": 7.5,
-            "num_inference_steps": 30,
+            "num_inference_steps": 20,
         }
     }).encode()
 
