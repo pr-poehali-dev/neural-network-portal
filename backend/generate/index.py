@@ -89,7 +89,7 @@ def call_gemini_txt2img(prompt: str, size: str = "square") -> bytes:
         }
     }).encode()
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1/models/imagen-3.0-generate-002:predict?key={api_key}"
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Content-Type", "application/json")
 
@@ -185,7 +185,7 @@ def call_huggingface_txt2img(prompt: str, size: str = "square") -> bytes:
         "options": {"wait_for_model": True}
     }).encode()
 
-    url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev/v1/text-to-image"
+    url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell/v1/text-to-image"
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Authorization", f"Bearer {token}")
     req.add_header("Content-Type", "application/json")
