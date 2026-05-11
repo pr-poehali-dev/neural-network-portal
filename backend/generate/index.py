@@ -221,19 +221,17 @@ def call_stability_txt2img(prompt: str, size: str = "square") -> bytes:
     }
     aspect = ASPECT_MAP.get(size, "1:1")
 
-    import urllib.parse
-    fields = urllib.parse.urlencode({
-        "prompt": prompt,
-        "aspect_ratio": aspect,
-        "output_format": "png",
-        "model": "sd3.5-large",
-    }).encode()
+    import uuid as _uuid
+    boundary = _uuid.uuid4().hex
+    def field(name, value):
+        return (f"--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"\r\n\r\n{value}\r\n").encode()
+    body = field("prompt", prompt) + field("aspect_ratio", aspect) + field("output_format", "png") + field("model", "sd3.5-large") + f"--{boundary}--\r\n".encode()
 
     url = "https://api.stability.ai/v2beta/stable-image/generate/sd3"
-    req = urllib.request.Request(url, data=fields, method="POST")
+    req = urllib.request.Request(url, data=body, method="POST")
     req.add_header("Authorization", f"Bearer {api_key}")
     req.add_header("Accept", "image/*")
-    req.add_header("Content-Type", "application/x-www-form-urlencoded")
+    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
 
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
