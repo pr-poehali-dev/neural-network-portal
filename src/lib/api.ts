@@ -124,7 +124,7 @@ export const generateApi = {
       method: "POST",
       headers: authHeaders(),
       body: JSON.stringify({ action: "image-edit", image_base64, prompt, size }),
-    }),
+    }, 120000),
 
   post: (topic: string, platform: string, tone: string, length: string, language: string, emoji_style: string) =>
     request<{ result: string; type: string }>(GENERATE_URL, {

@@ -92,13 +92,29 @@ export default function ImageGenTool() {
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { toast.error("Файл больше 5 МБ"); return; }
+    if (file.size > 10 * 1024 * 1024) { toast.error("Файл больше 10 МБ"); return; }
     const reader = new FileReader();
     reader.onload = (ev) => {
       const result = ev.target?.result as string;
       setEditImage(result);
-      const base64 = result.split(",")[1];
-      setEditImageFile(base64);
+      // Сжимаем до 1024px перед отправкой
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1024;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          const ratio = Math.min(MAX / width, MAX / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d")!.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.85);
+        setEditImageFile(compressed.split(",")[1]);
+      };
+      img.src = result;
     };
     reader.readAsDataURL(file);
   };
