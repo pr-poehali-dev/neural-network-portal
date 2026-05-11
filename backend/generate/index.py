@@ -66,9 +66,9 @@ SIZE_MAP = {
 
 def call_gemini_txt2img(prompt: str, size: str = "square") -> bytes:
     """Генерация изображения через gemini-2.0-flash-preview-image-generation"""
-    api_key = os.environ.get("GEMINI_API_KEY", "")
+    api_key = os.environ.get("IMAGEN_API_KEY", "") or os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
-        raise Exception("GEMINI_API_KEY не настроен")
+        raise Exception("IMAGEN_API_KEY не настроен")
 
     payload = json.dumps({
         "contents": [{"parts": [{"text": prompt}]}],
