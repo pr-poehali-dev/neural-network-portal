@@ -65,31 +65,17 @@ SIZE_MAP = {
 }
 
 def call_gemini_txt2img(prompt: str, size: str = "square") -> bytes:
-    """Генерация изображения через Google Gemini Imagen 3"""
+    """Генерация изображения через gemini-2.0-flash-preview-image-generation"""
     api_key = os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         raise Exception("GEMINI_API_KEY не настроен")
 
-    ASPECT_MAP = {
-        "square":    "1:1",
-        "portrait":  "3:4",
-        "landscape": "4:3",
-        "story":     "9:16",
-        "wide":      "16:9",
-    }
-    aspect = ASPECT_MAP.get(size, "1:1")
-
     payload = json.dumps({
-        "instances": [{"prompt": prompt}],
-        "parameters": {
-            "sampleCount": 1,
-            "aspectRatio": aspect,
-            "safetyFilterLevel": "block_few",
-            "personGeneration": "allow_adult",
-        }
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]}
     }).encode()
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key={api_key}"
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Content-Type", "application/json")
 
@@ -98,18 +84,16 @@ def call_gemini_txt2img(prompt: str, size: str = "square") -> bytes:
             data = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", errors="ignore")
-        print(f"[gemini imagen] HTTP {e.code}: {err[:500]}")
-        raise Exception(f"Gemini Imagen HTTP {e.code}: {err[:300]}")
+        print(f"[gemini flash img] HTTP {e.code}: {err[:500]}")
+        raise Exception(f"Gemini Flash Image HTTP {e.code}: {err[:300]}")
 
-    predictions = data.get("predictions", [])
-    if not predictions:
-        raise Exception(f"Gemini Imagen: пустой ответ — {str(data)[:200]}")
+    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+    for part in parts:
+        inline = part.get("inlineData", {})
+        if inline.get("data"):
+            return base64.b64decode(inline["data"])
 
-    b64_data = predictions[0].get("bytesBase64Encoded", "")
-    if not b64_data:
-        raise Exception(f"Gemini Imagen: нет изображения в ответе")
-
-    return base64.b64decode(b64_data)
+    raise Exception(f"Gemini Flash Image: нет изображения в ответе — {str(data)[:300]}")
 
 
 def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
