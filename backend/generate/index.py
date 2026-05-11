@@ -511,44 +511,100 @@ def generate_slide_image_pollinations(visual_prompt: str, style_prompt: str) -> 
     return generate_image_with_fallback(full_prompt, size="square")
 
 
-def generate_slide_image_with_photo(visual_prompt: str, style_prompt: str, user_image_b64: str) -> bytes:
-    """Генерирует изображение слайда с пользовательским фото через CF img2img"""
-    from PIL import Image
-    import io
-    account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "")
-    api_token = os.environ.get("CLOUDFLARE_API_TOKEN", "")
-    if not account_id or not api_token:
-        raise Exception("Cloudflare не настроен")
-    img_bytes = base64.b64decode(user_image_b64)
-    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-    img.thumbnail((512, 512), Image.LANCZOS)
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    image_array = list(buf.getvalue())
-    full_prompt = f"{visual_prompt}, {style_prompt}, instagram carousel, no text"
+def call_bratuha_img2img(image_bytes: bytes, prompt: str, size: str = "square") -> bytes:
+    """Редактирование фото через Bratuha.ru (nano-banana-2) с image_urls — синхронный polling"""
+    import time
+
+    api_key = os.environ.get("BROTHERKA_API_KEY", "")
+    if not api_key:
+        raise Exception("BROTHERKA_API_KEY не настроен")
+
+    # Загружаем исходное фото на S3 чтобы получить публичный URL
+    img_cdn_url = upload_image_to_s3(image_bytes, prefix="source")
+
+    ASPECT_MAP = {"square": "1:1", "portrait": "3:4", "landscape": "4:3", "story": "9:16", "wide": "16:9"}
+    aspect = ASPECT_MAP.get(size, "1:1")
+
     payload = json.dumps({
-        "prompt": full_prompt,
-        "image": image_array,
-        "strength": 0.6,
-        "num_steps": 20,
-        "guidance": 7.5,
+        "tool": "nano-banana-2",
+        "input": {
+            "mode": "cheap",
+            "prompt": prompt,
+            "image_urls": [img_cdn_url],
+            "aspect_ratio": aspect,
+            "image_size": "1K",
+        }
     }).encode()
-    url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/ai/run/@cf/runwayml/stable-diffusion-v1-5-img2img"
-    req = urllib.request.Request(url, data=payload, method="POST")
-    req.add_header("Authorization", f"Bearer {api_token}")
+
+    req = urllib.request.Request("https://bratuha.ru/api/v1/operations", data=payload, method="POST")
+    req.add_header("Authorization", f"Bearer {api_key}")
     req.add_header("Content-Type", "application/json")
+
     try:
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            raw = resp.read()
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", errors="ignore")
-        raise Exception(f"CF error {e.code}: {err[:200]}")
-    if raw[:4] == b'\x89PNG' or raw[:2] == b'\xff\xd8':
-        return raw
-    result = json.loads(raw)
-    if result.get("result", {}).get("image"):
-        return base64.b64decode(result["result"]["image"])
-    raise Exception(f"CF img2img неожиданный ответ")
+        raise Exception(f"Bratuha img2img HTTP {e.code}: {err[:200]}")
+
+    op_id = data.get("id")
+    if not op_id:
+        raise Exception(f"Bratuha img2img: нет id — {str(data)[:200]}")
+
+    print(f"[bratuha-img2img] operation_id={op_id}")
+
+    for attempt in range(60):
+        time.sleep(3)
+        status_req = urllib.request.Request(
+            f"https://bratuha.ru/api/v1/operations/{op_id}", method="GET"
+        )
+        status_req.add_header("Authorization", f"Bearer {api_key}")
+        try:
+            with urllib.request.urlopen(status_req, timeout=10) as resp:
+                status_data = json.loads(resp.read())
+        except Exception:
+            continue
+
+        status = status_data.get("status")
+        print(f"[bratuha-img2img] attempt {attempt+1}: {status}")
+
+        if status == "completed":
+            result = status_data.get("result", {})
+            img_url = None
+            if isinstance(result, dict):
+                for key in ("urls", "images", "outputs"):
+                    lst = result.get(key, [])
+                    if lst:
+                        first = lst[0]
+                        img_url = first if isinstance(first, str) else (first.get("url") or first.get("image_url"))
+                        if img_url:
+                            break
+                if not img_url:
+                    for key in ("url", "image_url", "image"):
+                        if result.get(key) and isinstance(result[key], str):
+                            img_url = result[key]
+                            break
+            elif isinstance(result, str) and result.startswith("http"):
+                img_url = result
+
+            if not img_url:
+                raise Exception(f"Bratuha img2img: нет URL — {str(result)[:200]}")
+
+            dl_req = urllib.request.Request(img_url, method="GET")
+            with urllib.request.urlopen(dl_req, timeout=30) as resp:
+                return resp.read()
+
+        if status == "failed":
+            raise Exception(f"Bratuha img2img: ошибка — {status_data.get('error_message', '')}")
+
+    raise Exception("Bratuha img2img: таймаут ожидания")
+
+
+def generate_slide_image_with_photo(visual_prompt: str, style_prompt: str, user_image_b64: str) -> bytes:
+    """Генерирует изображение слайда с пользовательским фото через Bratuha img2img"""
+    img_bytes = base64.b64decode(user_image_b64)
+    full_prompt = f"{visual_prompt}, {style_prompt}, instagram carousel, no text"
+    return call_bratuha_img2img(img_bytes, full_prompt, size="square")
 
 
 def generate_text_with_openrouter(prompt: str, system: str = "") -> str:
@@ -739,7 +795,7 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
 
         try:
-            result_bytes = call_cloudflare_img2img(image_bytes, prompt)
+            result_bytes = call_bratuha_img2img(image_bytes, prompt, size)
             cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
         except Exception as e:
@@ -856,7 +912,8 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Загрузите фото"})}
         try:
             img_bytes = base64.b64decode(image_b64)
-            result_bytes = generate_slide_image_with_photo(style_prompt, "high quality portrait, detailed", image_b64)
+            full_prompt = f"{style_prompt}, high quality portrait, detailed, professional"
+            result_bytes = call_bratuha_img2img(img_bytes, full_prompt, size="square")
             cdn_url = upload_image_to_s3(result_bytes, prefix="avatars")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url})}
         except Exception as e:
