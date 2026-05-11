@@ -65,17 +65,31 @@ SIZE_MAP = {
 }
 
 def call_gemini_txt2img(prompt: str, size: str = "square") -> bytes:
-    """Генерация изображения через gemini-2.0-flash-preview-image-generation"""
+    """Генерация изображения через Google Imagen 3 (imagen-3.0-generate-002)"""
     api_key = os.environ.get("IMAGEN_API_KEY", "") or os.environ.get("GEMINI_API_KEY", "")
     if not api_key:
         raise Exception("IMAGEN_API_KEY не настроен")
 
+    ASPECT_MAP = {
+        "square":    "1:1",
+        "portrait":  "3:4",
+        "landscape": "4:3",
+        "story":     "9:16",
+        "wide":      "16:9",
+    }
+    aspect = ASPECT_MAP.get(size, "1:1")
+
     payload = json.dumps({
-        "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {"responseModalities": ["TEXT", "IMAGE"]}
+        "instances": [{"prompt": prompt}],
+        "parameters": {
+            "sampleCount": 1,
+            "aspectRatio": aspect,
+            "safetyFilterLevel": "block_few",
+            "personGeneration": "allow_adult",
+        }
     }).encode()
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-preview-image-generation:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key={api_key}"
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Content-Type", "application/json")
 
@@ -84,16 +98,16 @@ def call_gemini_txt2img(prompt: str, size: str = "square") -> bytes:
             data = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", errors="ignore")
-        print(f"[gemini flash img] HTTP {e.code}: {err[:500]}")
-        raise Exception(f"Gemini Flash Image HTTP {e.code}: {err[:300]}")
+        print(f"[imagen3] HTTP {e.code}: {err[:500]}")
+        raise Exception(f"Imagen 3 HTTP {e.code}: {err[:300]}")
 
-    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-    for part in parts:
-        inline = part.get("inlineData", {})
-        if inline.get("data"):
-            return base64.b64decode(inline["data"])
-
-    raise Exception(f"Gemini Flash Image: нет изображения в ответе — {str(data)[:300]}")
+    predictions = data.get("predictions", [])
+    if not predictions:
+        raise Exception(f"Imagen 3: пустой ответ — {str(data)[:200]}")
+    b64 = predictions[0].get("bytesBase64Encoded", "")
+    if not b64:
+        raise Exception(f"Imagen 3: нет изображения в ответе")
+    return base64.b64decode(b64)
 
 
 def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
@@ -167,10 +181,11 @@ def call_huggingface_txt2img(prompt: str, size: str = "square") -> bytes:
 
     payload = json.dumps({
         "inputs": prompt,
-        "parameters": {"width": w, "height": h, "num_inference_steps": 28, "guidance_scale": 3.5}
+        "parameters": {"width": w, "height": h, "num_inference_steps": 28, "guidance_scale": 3.5},
+        "options": {"wait_for_model": True}
     }).encode()
 
-    url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
+    url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-dev/v1/text-to-image"
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Authorization", f"Bearer {token}")
     req.add_header("Content-Type", "application/json")
@@ -178,11 +193,12 @@ def call_huggingface_txt2img(prompt: str, size: str = "square") -> bytes:
     try:
         with urllib.request.urlopen(req, timeout=120) as resp:
             data = resp.read()
-            if resp.headers.get("Content-Type", "").startswith("image/"):
+            content_type = resp.headers.get("Content-Type", "")
+            if content_type.startswith("image/"):
                 return data
             result = json.loads(data)
-            if isinstance(result, list) and result[0].get("generated_image"):
-                return base64.b64decode(result[0]["generated_image"])
+            if isinstance(result, dict) and result.get("image"):
+                return base64.b64decode(result["image"])
             raise Exception(f"HuggingFace неожиданный ответ: {str(result)[:200]}")
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", errors="ignore")
@@ -191,17 +207,12 @@ def call_huggingface_txt2img(prompt: str, size: str = "square") -> bytes:
 
 
 def generate_image_with_fallback(prompt: str, size: str = "square") -> bytes:
-    """Цепочка: GPT Image 1 → HuggingFace FLUX.1 → Gemini Flash"""
-    try:
-        print(f"[image] GPT Image 1: {prompt[:80]}")
-        return call_gpt_image(prompt, size)
-    except Exception as e:
-        print(f"[image] GPT Image failed ({e}), fallback → HuggingFace")
+    """Цепочка: HuggingFace FLUX.1-dev → Imagen 3"""
     try:
         print(f"[image] HuggingFace FLUX.1-dev: {prompt[:80]}")
         return call_huggingface_txt2img(prompt, size)
     except Exception as e:
-        print(f"[image] HuggingFace failed ({e}), fallback → Gemini")
+        print(f"[image] HuggingFace failed ({e}), fallback → Imagen 3")
     return call_gemini_txt2img(prompt, size)
 
 def resize_image(image_bytes: bytes, max_size: int = 512) -> bytes:
