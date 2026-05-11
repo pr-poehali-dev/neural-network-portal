@@ -65,11 +65,23 @@ export default function ImageGenTool() {
     setLoading(true);
     setResultUrl(null);
     try {
-      const fullPrompt = style ? `${prompt}, style: ${style}` : prompt;
-      const res = await generateApi.imageGen(fullPrompt, style, size);
-      setResultUrl(res.image_url);
-      await toolsApi.saveGeneration("image-gen", fullPrompt, res.image_url);
-      toast.success("Изображение создано!");
+      const started = await generateApi.brathuaStart(prompt, style, size);
+      const { operation_id, prompt: fullPrompt } = started;
+
+      for (let i = 0; i < 40; i++) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const poll = await generateApi.bratuhaPoll(operation_id, fullPrompt);
+        if (poll.status === "completed" && poll.image_url) {
+          setResultUrl(poll.image_url);
+          await toolsApi.saveGeneration("image-gen", fullPrompt, poll.image_url);
+          toast.success("Изображение создано!");
+          return;
+        }
+        if (poll.status === "failed") {
+          throw new Error(poll.error || "Ошибка генерации");
+        }
+      }
+      throw new Error("Превышено время ожидания. Попробуйте ещё раз.");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Ошибка генерации");
     } finally {

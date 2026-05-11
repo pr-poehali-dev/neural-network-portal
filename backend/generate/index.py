@@ -609,7 +609,91 @@ def handler(event: dict, context) -> dict:
 
     action = body.get("action", "")
 
-    if action == "image-gen":
+    if action == "bratuha-start":
+        prompt = body.get("prompt", "")
+        style = body.get("style", "")
+        size = body.get("size", "square")
+        if not prompt:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите описание изображения"})}
+
+        api_key = os.environ.get("BROTHERKA_API_KEY", "")
+        if not api_key:
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": "BROTHERKA_API_KEY не настроен"})}
+
+        ASPECT_MAP = {"square": "1:1", "portrait": "3:4", "landscape": "4:3", "story": "9:16", "wide": "16:9"}
+        aspect = ASPECT_MAP.get(size, "1:1")
+        full_prompt = f"{prompt}, {style}" if style else prompt
+        full_prompt += ", high quality, 8k, photorealistic"
+
+        payload = json.dumps({
+            "tool": "nano-banana-2",
+            "input": {"mode": "cheap", "prompt": full_prompt, "aspect_ratio": aspect, "image_size": "1K"}
+        }).encode()
+
+        req = urllib.request.Request("https://bratuha.ru/api/v1/operations", data=payload, method="POST")
+        req.add_header("Authorization", f"Bearer {api_key}")
+        req.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            err = e.read().decode("utf-8", errors="ignore")
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Bratuha HTTP {e.code}: {err[:200]}"})}
+
+        op_id = data.get("id")
+        if not op_id:
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Bratuha: нет id — {str(data)[:200]}"})}
+
+        print(f"[bratuha-start] operation_id={op_id}")
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"operation_id": op_id, "prompt": full_prompt})}
+
+    elif action == "bratuha-poll":
+        op_id = body.get("operation_id", "")
+        prompt = body.get("prompt", "")
+        if not op_id:
+            return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "operation_id обязателен"})}
+
+        api_key = os.environ.get("BROTHERKA_API_KEY", "")
+        req = urllib.request.Request(f"https://bratuha.ru/api/v1/operations/{op_id}", method="GET")
+        req.add_header("Authorization", f"Bearer {api_key}")
+        try:
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                data = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            err = e.read().decode("utf-8", errors="ignore")
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Bratuha poll HTTP {e.code}: {err[:200]}"})}
+
+        status = data.get("status")
+        print(f"[bratuha-poll] {op_id}: {status}")
+
+        if status == "failed":
+            return {"statusCode": 200, "headers": headers, "body": json.dumps({"status": "failed", "error": data.get("error_message", "Ошибка генерации")})}
+
+        if status != "completed":
+            return {"statusCode": 200, "headers": headers, "body": json.dumps({"status": status})}
+
+        result = data.get("result", {})
+        img_url = None
+        if isinstance(result, dict):
+            images = result.get("images", [])
+            if images:
+                img_url = images[0] if isinstance(images[0], str) else images[0].get("url")
+            if not img_url:
+                img_url = result.get("url") or result.get("image_url")
+        elif isinstance(result, str):
+            img_url = result
+
+        if not img_url:
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Bratuha: нет URL — {str(result)[:200]}"})}
+
+        dl_req = urllib.request.Request(img_url, method="GET")
+        with urllib.request.urlopen(dl_req, timeout=30) as resp:
+            image_bytes = resp.read()
+
+        cdn_url = upload_image_to_s3(image_bytes, prefix="generated")
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"status": "completed", "image_url": cdn_url, "prompt": prompt})}
+
+    elif action == "image-gen":
         prompt = body.get("prompt", "")
         style = body.get("style", "")
         size = body.get("size", "square")

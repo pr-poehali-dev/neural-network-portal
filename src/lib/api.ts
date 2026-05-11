@@ -105,6 +105,20 @@ export const generateApi = {
       body: JSON.stringify({ action: "image-gen", prompt, style, size }),
     }),
 
+  brathuaStart: (prompt: string, style: string, size: string = "square") =>
+    request<{ operation_id: string; prompt: string }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "bratuha-start", prompt, style, size }),
+    }, 20000),
+
+  bratuhaPoll: (operation_id: string, prompt: string) =>
+    request<{ status: string; image_url?: string; prompt?: string; error?: string }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "bratuha-poll", operation_id, prompt }),
+    }, 15000),
+
   imageEdit: (image_base64: string, prompt: string, size: string = "square") =>
     request<{ image_url: string; prompt: string }>(GENERATE_URL, {
       method: "POST",
