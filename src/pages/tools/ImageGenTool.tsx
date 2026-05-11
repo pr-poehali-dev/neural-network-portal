@@ -127,10 +127,23 @@ export default function ImageGenTool() {
     setEditLoading(true);
     setEditResultUrl(null);
     try {
-      const res = await generateApi.imageEdit(editImageFile, editPrompt, editSize);
-      setEditResultUrl(res.image_url);
-      await toolsApi.saveGeneration("image-edit", editPrompt, res.image_url);
-      toast.success("Фото отредактировано!");
+      const started = await generateApi.brathuaEditStart(editImageFile, editPrompt, editSize);
+      const { operation_id, prompt: fullPrompt } = started;
+
+      for (let i = 0; i < 40; i++) {
+        await new Promise((r) => setTimeout(r, 4000));
+        const poll = await generateApi.bratuhaPoll(operation_id, fullPrompt);
+        if (poll.status === "completed" && poll.image_url) {
+          setEditResultUrl(poll.image_url);
+          await toolsApi.saveGeneration("image-edit", fullPrompt, poll.image_url);
+          toast.success("Фото отредактировано!");
+          return;
+        }
+        if (poll.status === "failed") {
+          throw new Error(poll.error || "Ошибка редактирования");
+        }
+      }
+      throw new Error("Превышено время ожидания. Попробуйте ещё раз.");
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : "Ошибка редактирования");
     } finally {

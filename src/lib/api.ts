@@ -126,6 +126,13 @@ export const generateApi = {
       body: JSON.stringify({ action: "image-edit", image_base64, prompt, size }),
     }, 120000),
 
+  brathuaEditStart: (image_base64: string, prompt: string, size: string = "square") =>
+    request<{ operation_id: string; prompt: string }>(GENERATE_URL, {
+      method: "POST",
+      headers: authHeaders(),
+      body: JSON.stringify({ action: "bratuha-edit-start", image_base64, prompt, size }),
+    }, 30000),
+
   post: (topic: string, platform: string, tone: string, length: string, language: string, emoji_style: string) =>
     request<{ result: string; type: string }>(GENERATE_URL, {
       method: "POST",

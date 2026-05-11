@@ -782,26 +782,59 @@ def handler(event: dict, context) -> dict:
             print(f"[image-gen error] {error_msg}")
             return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Ошибка генерации: {error_msg}"})}
 
-    elif action == "image-edit":
+    elif action == "bratuha-edit-start":
         prompt = body.get("prompt", "")
         image_b64 = body.get("image_base64", "")
         size = body.get("size", "square")
         if not prompt or not image_b64:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Укажите изображение и описание изменений"})}
 
+        api_key = os.environ.get("BROTHERKA_API_KEY", "")
+        if not api_key:
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": "BROTHERKA_API_KEY не настроен"})}
+
         try:
             image_bytes = base64.b64decode(image_b64)
         except Exception:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Неверный формат изображения"})}
 
+        # Загружаем фото на S3 → получаем публичный URL
+        img_cdn_url = upload_image_to_s3(image_bytes, prefix="source")
+
+        ASPECT_MAP = {"square": "1:1", "portrait": "3:4", "landscape": "4:3", "story": "9:16", "wide": "16:9"}
+        aspect = ASPECT_MAP.get(size, "1:1")
+
+        payload = json.dumps({
+            "tool": "nano-banana-2",
+            "input": {
+                "mode": "cheap",
+                "prompt": prompt,
+                "image_urls": [img_cdn_url],
+                "aspect_ratio": aspect,
+                "image_size": "1K",
+            }
+        }).encode()
+
+        req = urllib.request.Request("https://bratuha.ru/api/v1/operations", data=payload, method="POST")
+        req.add_header("Authorization", f"Bearer {api_key}")
+        req.add_header("Content-Type", "application/json")
         try:
-            result_bytes = call_bratuha_img2img(image_bytes, prompt, size)
-            cdn_url = upload_image_to_s3(result_bytes, prefix="edited")
-            return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": prompt})}
-        except Exception as e:
-            error_msg = str(e)
-            print(f"[image-edit error] {error_msg}")
-            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Ошибка редактирования: {error_msg}"})}
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            err = e.read().decode("utf-8", errors="ignore")
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Bratuha HTTP {e.code}: {err[:200]}"})}
+
+        op_id = data.get("id")
+        if not op_id:
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Bratuha: нет id — {str(data)[:200]}"})}
+
+        print(f"[bratuha-edit-start] operation_id={op_id}")
+        return {"statusCode": 200, "headers": headers, "body": json.dumps({"operation_id": op_id, "prompt": prompt})}
+
+    elif action == "image-edit":
+        # Оставляем для обратной совместимости, но не используется активно
+        return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Используйте bratuha-edit-start + bratuha-poll"})}
 
     elif action == "post":
         topic = body.get("topic", "")
