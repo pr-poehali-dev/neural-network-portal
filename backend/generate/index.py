@@ -181,11 +181,11 @@ def call_huggingface_txt2img(prompt: str, size: str = "square") -> bytes:
 
     payload = json.dumps({
         "inputs": prompt,
-        "parameters": {"width": w, "height": h, "num_inference_steps": 28, "guidance_scale": 3.5},
-        "options": {"wait_for_model": True}
+        "parameters": {"num_inference_steps": 30, "guidance_scale": 7.5},
+        "options": {"wait_for_model": True, "use_cache": False}
     }).encode()
 
-    url = "https://router.huggingface.co/hf-inference/models/black-forest-labs/FLUX.1-schnell/v1/text-to-image"
+    url = "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-xl-base-1.0"
     req = urllib.request.Request(url, data=payload, method="POST")
     req.add_header("Authorization", f"Bearer {token}")
     req.add_header("Content-Type", "application/json")
@@ -207,13 +207,18 @@ def call_huggingface_txt2img(prompt: str, size: str = "square") -> bytes:
 
 
 def generate_image_with_fallback(prompt: str, size: str = "square") -> bytes:
-    """Цепочка: HuggingFace FLUX.1-dev → Imagen 3"""
+    """Цепочка: HuggingFace SDXL → Imagen 3 → Pollinations Flux"""
     try:
-        print(f"[image] HuggingFace FLUX.1-dev: {prompt[:80]}")
+        print(f"[image] HuggingFace SDXL: {prompt[:80]}")
         return call_huggingface_txt2img(prompt, size)
     except Exception as e:
         print(f"[image] HuggingFace failed ({e}), fallback → Imagen 3")
-    return call_gemini_txt2img(prompt, size)
+    try:
+        print(f"[image] Imagen 3: {prompt[:80]}")
+        return call_gemini_txt2img(prompt, size)
+    except Exception as e:
+        print(f"[image] Imagen 3 failed ({e}), fallback → Pollinations")
+    return call_pollinations_txt2img(prompt, size)
 
 def resize_image(image_bytes: bytes, max_size: int = 512) -> bytes:
     """Сжимает изображение до max_size по большей стороне через PIL"""
