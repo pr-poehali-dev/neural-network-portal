@@ -191,7 +191,7 @@ def call_huggingface_txt2img(prompt: str, size: str = "square") -> bytes:
 
 
 def generate_image_with_fallback(prompt: str, size: str = "square") -> bytes:
-    """Цепочка: GPT Image 1 → HuggingFace FLUX.1 → Gemini Flash → Pollinations Flux"""
+    """Цепочка: GPT Image 1 → HuggingFace FLUX.1 → Gemini Flash"""
     try:
         print(f"[image] GPT Image 1: {prompt[:80]}")
         return call_gpt_image(prompt, size)
@@ -202,11 +202,7 @@ def generate_image_with_fallback(prompt: str, size: str = "square") -> bytes:
         return call_huggingface_txt2img(prompt, size)
     except Exception as e:
         print(f"[image] HuggingFace failed ({e}), fallback → Gemini")
-    try:
-        return call_gemini_txt2img(prompt, size)
-    except Exception as e:
-        print(f"[image] Gemini failed ({e}), fallback → Pollinations")
-        return call_pollinations_txt2img(prompt, size)
+    return call_gemini_txt2img(prompt, size)
 
 def resize_image(image_bytes: bytes, max_size: int = 512) -> bytes:
     """Сжимает изображение до max_size по большей стороне через PIL"""
