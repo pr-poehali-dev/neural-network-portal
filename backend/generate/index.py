@@ -206,19 +206,52 @@ def call_huggingface_txt2img(prompt: str, size: str = "square") -> bytes:
         raise Exception(f"HuggingFace HTTP {e.code}: {err[:300]}")
 
 
+def call_stability_txt2img(prompt: str, size: str = "square") -> bytes:
+    """Генерация изображения через Stability AI (stable-diffusion-3-5-large)"""
+    api_key = os.environ.get("STABILITY_API_KEY", "")
+    if not api_key:
+        raise Exception("STABILITY_API_KEY не настроен")
+
+    ASPECT_MAP = {
+        "square":    "1:1",
+        "portrait":  "3:4",
+        "landscape": "4:3",
+        "story":     "9:16",
+        "wide":      "16:9",
+    }
+    aspect = ASPECT_MAP.get(size, "1:1")
+
+    import urllib.parse
+    fields = urllib.parse.urlencode({
+        "prompt": prompt,
+        "aspect_ratio": aspect,
+        "output_format": "png",
+        "model": "sd3.5-large",
+    }).encode()
+
+    url = "https://api.stability.ai/v2beta/stable-image/generate/sd3"
+    req = urllib.request.Request(url, data=fields, method="POST")
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Accept", "image/*")
+    req.add_header("Content-Type", "application/x-www-form-urlencoded")
+
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            return resp.read()
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="ignore")
+        print(f"[stability] HTTP {e.code}: {err[:500]}")
+        raise Exception(f"Stability AI HTTP {e.code}: {err[:300]}")
+
+
 def generate_image_with_fallback(prompt: str, size: str = "square") -> bytes:
-    """Цепочка: HuggingFace SDXL → Imagen 3 → Pollinations Flux"""
+    """Цепочка: Stability AI SD3.5 → Imagen 3"""
     try:
-        print(f"[image] HuggingFace SDXL: {prompt[:80]}")
-        return call_huggingface_txt2img(prompt, size)
+        print(f"[image] Stability AI SD3.5: {prompt[:80]}")
+        return call_stability_txt2img(prompt, size)
     except Exception as e:
-        print(f"[image] HuggingFace failed ({e}), fallback → Imagen 3")
-    try:
-        print(f"[image] Imagen 3: {prompt[:80]}")
-        return call_gemini_txt2img(prompt, size)
-    except Exception as e:
-        print(f"[image] Imagen 3 failed ({e}), fallback → Pollinations")
-    return call_pollinations_txt2img(prompt, size)
+        print(f"[image] Stability failed ({e}), fallback → Imagen 3")
+    return call_gemini_txt2img(prompt, size)
 
 def resize_image(image_bytes: bytes, max_size: int = 512) -> bytes:
     """Сжимает изображение до max_size по большей стороне через PIL"""
