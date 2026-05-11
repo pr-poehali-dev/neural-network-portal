@@ -200,17 +200,27 @@ export default function ImageGenTool() {
                 {resultUrl && (
                   <div className="space-y-3">
                     <img src={resultUrl} alt="Результат" className="w-full rounded-xl border border-white/10" />
-                    <a
-                      href={resultUrl}
-                      download="generated.png"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Button
+                      variant="outline"
+                      className="w-full border-white/10 text-white hover:bg-white/5"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(resultUrl);
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = "neural-image.png";
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        } catch {
+                          window.open(resultUrl, "_blank");
+                        }
+                      }}
                     >
-                      <Button variant="outline" className="w-full border-white/10 text-white hover:bg-white/5">
-                        <Icon name="Download" size={16} className="mr-2" />
-                        Скачать изображение
-                      </Button>
-                    </a>
+                      <Icon name="Download" size={16} className="mr-2" />
+                      Скачать изображение
+                    </Button>
                   </div>
                 )}
               </div>
@@ -281,17 +291,27 @@ export default function ImageGenTool() {
                   <div className="space-y-3">
                     <p className="text-xs text-white/40">Результат:</p>
                     <img src={editResultUrl} alt="Результат" className="w-full rounded-xl border border-white/10" />
-                    <a
-                      href={editResultUrl}
-                      download="edited.png"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <Button
+                      variant="outline"
+                      className="w-full border-white/10 text-white hover:bg-white/5"
+                      onClick={async () => {
+                        try {
+                          const res = await fetch(editResultUrl);
+                          const blob = await res.blob();
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = "edited-image.png";
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        } catch {
+                          window.open(editResultUrl, "_blank");
+                        }
+                      }}
                     >
-                      <Button variant="outline" className="w-full border-white/10 text-white hover:bg-white/5">
-                        <Icon name="Download" size={16} className="mr-2" />
-                        Скачать изображение
-                      </Button>
-                    </a>
+                      <Icon name="Download" size={16} className="mr-2" />
+                      Скачать изображение
+                    </Button>
                   </div>
                 )}
               </div>

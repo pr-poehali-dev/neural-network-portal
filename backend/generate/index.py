@@ -673,19 +673,35 @@ def handler(event: dict, context) -> dict:
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"status": status})}
 
         result = data.get("result", {})
+        print(f"[bratuha-poll] completed result: {json.dumps(result)[:500]}")
+
         img_url = None
         if isinstance(result, dict):
-            images = result.get("images", [])
-            if images:
-                img_url = images[0] if isinstance(images[0], str) else images[0].get("url")
+            # Перебираем все возможные поля
+            for key in ("url", "image_url", "image", "output", "output_url"):
+                if result.get(key) and isinstance(result[key], str):
+                    img_url = result[key]
+                    break
             if not img_url:
-                img_url = result.get("url") or result.get("image_url")
-        elif isinstance(result, str):
+                images = result.get("images", [])
+                if images:
+                    first = images[0]
+                    img_url = first if isinstance(first, str) else (first.get("url") or first.get("image_url"))
+            if not img_url:
+                outputs = result.get("outputs", [])
+                if outputs:
+                    first = outputs[0]
+                    img_url = first if isinstance(first, str) else (first.get("url") or first.get("image_url"))
+        elif isinstance(result, list) and result:
+            first = result[0]
+            img_url = first if isinstance(first, str) else (first.get("url") or first.get("image_url"))
+        elif isinstance(result, str) and result.startswith("http"):
             img_url = result
 
         if not img_url:
-            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Bratuha: нет URL — {str(result)[:200]}"})}
+            return {"statusCode": 500, "headers": headers, "body": json.dumps({"error": f"Bratuha: нет URL в result — {str(result)[:300]}"})}
 
+        print(f"[bratuha-poll] downloading image: {img_url}")
         dl_req = urllib.request.Request(img_url, method="GET")
         with urllib.request.urlopen(dl_req, timeout=30) as resp:
             image_bytes = resp.read()
