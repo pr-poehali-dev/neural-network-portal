@@ -108,10 +108,56 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
         return resp.read()
 
 
-def generate_image_with_fallback(prompt: str, size: str = "square") -> bytes:
-    """Генерирует изображение: сначала Gemini Imagen 3, при ошибке — Pollinations Flux"""
+def call_gpt_image(prompt: str, size: str = "square") -> bytes:
+    """Генерация изображения через GPT Image 1 (gpt-image-1)"""
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        raise Exception("OPENAI_API_KEY не настроен")
+
+    SIZE_OPENAI = {
+        "square":    "1024x1024",
+        "portrait":  "1024x1536",
+        "landscape": "1536x1024",
+        "story":     "1024x1536",
+        "wide":      "1536x1024",
+    }
+    img_size = SIZE_OPENAI.get(size, "1024x1024")
+
+    payload = json.dumps({
+        "model": "gpt-image-1",
+        "prompt": prompt,
+        "n": 1,
+        "size": img_size,
+        "quality": "standard",
+        "output_format": "png",
+    }).encode()
+
+    req = urllib.request.Request("https://api.openai.com/v1/images/generations", data=payload, method="POST")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Authorization", f"Bearer {api_key}")
+
     try:
-        print(f"[image] Gemini Imagen 3: {prompt[:80]}")
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="ignore")
+        print(f"[gpt-image] HTTP {e.code}: {err[:500]}")
+        raise Exception(f"GPT Image HTTP {e.code}: {err[:300]}")
+
+    b64 = data.get("data", [{}])[0].get("b64_json", "")
+    if not b64:
+        raise Exception(f"GPT Image: нет изображения в ответе — {str(data)[:200]}")
+    return base64.b64decode(b64)
+
+
+def generate_image_with_fallback(prompt: str, size: str = "square") -> bytes:
+    """Цепочка: GPT Image 1 → Gemini Flash → Pollinations Flux"""
+    try:
+        print(f"[image] GPT Image 1: {prompt[:80]}")
+        return call_gpt_image(prompt, size)
+    except Exception as e:
+        print(f"[image] GPT Image failed ({e}), fallback → Gemini")
+    try:
         return call_gemini_txt2img(prompt, size)
     except Exception as e:
         print(f"[image] Gemini failed ({e}), fallback → Pollinations")
