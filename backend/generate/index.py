@@ -677,21 +677,19 @@ def handler(event: dict, context) -> dict:
 
         img_url = None
         if isinstance(result, dict):
-            # Перебираем все возможные поля
-            for key in ("url", "image_url", "image", "output", "output_url"):
-                if result.get(key) and isinstance(result[key], str):
-                    img_url = result[key]
-                    break
-            if not img_url:
-                images = result.get("images", [])
-                if images:
-                    first = images[0]
+            # urls — основной формат Братухи
+            for key in ("urls", "images", "outputs"):
+                lst = result.get(key, [])
+                if lst:
+                    first = lst[0]
                     img_url = first if isinstance(first, str) else (first.get("url") or first.get("image_url"))
+                    if img_url:
+                        break
             if not img_url:
-                outputs = result.get("outputs", [])
-                if outputs:
-                    first = outputs[0]
-                    img_url = first if isinstance(first, str) else (first.get("url") or first.get("image_url"))
+                for key in ("url", "image_url", "image", "output", "output_url"):
+                    if result.get(key) and isinstance(result[key], str):
+                        img_url = result[key]
+                        break
         elif isinstance(result, list) and result:
             first = result[0]
             img_url = first if isinstance(first, str) else (first.get("url") or first.get("image_url"))
