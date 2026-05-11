@@ -206,6 +206,55 @@ def call_huggingface_txt2img(prompt: str, size: str = "square") -> bytes:
         raise Exception(f"HuggingFace HTTP {e.code}: {err[:300]}")
 
 
+def call_fal_txt2img(prompt: str, size: str = "square") -> bytes:
+    """Генерация изображения через fal.ai FLUX.1-schnell"""
+    api_key = os.environ.get("FAL_API_KEY", "")
+    if not api_key:
+        raise Exception("FAL_API_KEY не настроен")
+
+    IMAGE_SIZE_MAP = {
+        "square":    "square_hd",
+        "portrait":  "portrait_4_3",
+        "landscape": "landscape_4_3",
+        "story":     "portrait_16_9",
+        "wide":      "landscape_16_9",
+    }
+    image_size = IMAGE_SIZE_MAP.get(size, "square_hd")
+
+    payload = json.dumps({
+        "prompt": prompt,
+        "image_size": image_size,
+        "num_inference_steps": 4,
+        "num_images": 1,
+        "enable_safety_checker": False,
+    }).encode()
+
+    url = "https://fal.run/fal-ai/flux/schnell"
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Authorization", f"Key {api_key}")
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="ignore")
+        print(f"[fal] HTTP {e.code}: {err[:500]}")
+        raise Exception(f"fal.ai HTTP {e.code}: {err[:300]}")
+
+    images = data.get("images", [])
+    if not images:
+        raise Exception(f"fal.ai: нет изображения в ответе — {str(data)[:200]}")
+
+    img_url = images[0].get("url", "")
+    if not img_url:
+        raise Exception("fal.ai: нет URL изображения")
+
+    req2 = urllib.request.Request(img_url, method="GET")
+    with urllib.request.urlopen(req2, timeout=60) as resp:
+        return resp.read()
+
+
 def call_stability_txt2img(prompt: str, size: str = "square") -> bytes:
     """Генерация изображения через Stability AI (stable-diffusion-3-5-large)"""
     api_key = os.environ.get("STABILITY_API_KEY", "")
@@ -243,13 +292,13 @@ def call_stability_txt2img(prompt: str, size: str = "square") -> bytes:
 
 
 def generate_image_with_fallback(prompt: str, size: str = "square") -> bytes:
-    """Цепочка: Stability AI SD3.5 → Imagen 3"""
+    """Цепочка: fal.ai FLUX.1 → Stability AI SD3.5"""
     try:
-        print(f"[image] Stability AI SD3.5: {prompt[:80]}")
-        return call_stability_txt2img(prompt, size)
+        print(f"[image] fal.ai FLUX.1: {prompt[:80]}")
+        return call_fal_txt2img(prompt, size)
     except Exception as e:
-        print(f"[image] Stability failed ({e}), fallback → Imagen 3")
-    return call_gemini_txt2img(prompt, size)
+        print(f"[image] fal.ai failed ({e}), fallback → Stability AI")
+    return call_stability_txt2img(prompt, size)
 
 def resize_image(image_bytes: bytes, max_size: int = 512) -> bytes:
     """Сжимает изображение до max_size по большей стороне через PIL"""
