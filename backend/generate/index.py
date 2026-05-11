@@ -150,13 +150,58 @@ def call_gpt_image(prompt: str, size: str = "square") -> bytes:
     return base64.b64decode(b64)
 
 
+def call_huggingface_txt2img(prompt: str, size: str = "square") -> bytes:
+    """Генерация изображения через Hugging Face FLUX.1-dev"""
+    token = os.environ.get("HUGGINGFACE_TOKEN", "")
+    if not token:
+        raise Exception("HUGGINGFACE_TOKEN не настроен")
+
+    HF_SIZE_MAP = {
+        "square":    (1024, 1024),
+        "portrait":  (768, 1024),
+        "landscape": (1024, 768),
+        "story":     (576, 1024),
+        "wide":      (1280, 720),
+    }
+    w, h = HF_SIZE_MAP.get(size, (1024, 1024))
+
+    payload = json.dumps({
+        "inputs": prompt,
+        "parameters": {"width": w, "height": h, "num_inference_steps": 28, "guidance_scale": 3.5}
+    }).encode()
+
+    url = "https://api-inference.huggingface.co/models/black-forest-labs/FLUX.1-dev"
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Authorization", f"Bearer {token}")
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = resp.read()
+            if resp.headers.get("Content-Type", "").startswith("image/"):
+                return data
+            result = json.loads(data)
+            if isinstance(result, list) and result[0].get("generated_image"):
+                return base64.b64decode(result[0]["generated_image"])
+            raise Exception(f"HuggingFace неожиданный ответ: {str(result)[:200]}")
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="ignore")
+        print(f"[huggingface] HTTP {e.code}: {err[:500]}")
+        raise Exception(f"HuggingFace HTTP {e.code}: {err[:300]}")
+
+
 def generate_image_with_fallback(prompt: str, size: str = "square") -> bytes:
-    """Цепочка: GPT Image 1 → Gemini Flash → Pollinations Flux"""
+    """Цепочка: GPT Image 1 → HuggingFace FLUX.1 → Gemini Flash → Pollinations Flux"""
     try:
         print(f"[image] GPT Image 1: {prompt[:80]}")
         return call_gpt_image(prompt, size)
     except Exception as e:
-        print(f"[image] GPT Image failed ({e}), fallback → Gemini")
+        print(f"[image] GPT Image failed ({e}), fallback → HuggingFace")
+    try:
+        print(f"[image] HuggingFace FLUX.1-dev: {prompt[:80]}")
+        return call_huggingface_txt2img(prompt, size)
+    except Exception as e:
+        print(f"[image] HuggingFace failed ({e}), fallback → Gemini")
     try:
         return call_gemini_txt2img(prompt, size)
     except Exception as e:
