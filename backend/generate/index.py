@@ -291,10 +291,99 @@ def call_stability_txt2img(prompt: str, size: str = "square") -> bytes:
         raise Exception(f"Stability AI HTTP {e.code}: {err[:300]}")
 
 
-def generate_image_with_fallback(prompt: str, size: str = "square") -> bytes:
-    """Цепочка: fal.ai FLUX.1 → Stability AI SD3.5"""
+def call_bratuha_txt2img(prompt: str, size: str = "square") -> bytes:
+    """Генерация изображения через Bratuha.ru (nano-banana-2)"""
+    import time
+    api_key = os.environ.get("BROTHERKA_API_KEY", "")
+    if not api_key:
+        raise Exception("BROTHERKA_API_KEY не настроен")
+
+    ASPECT_MAP = {
+        "square":    "1:1",
+        "portrait":  "3:4",
+        "landscape": "4:3",
+        "story":     "9:16",
+        "wide":      "16:9",
+    }
+    aspect = ASPECT_MAP.get(size, "1:1")
+
+    payload = json.dumps({
+        "tool": "nano-banana-2",
+        "input": {
+            "mode": "cheap",
+            "prompt": prompt,
+            "aspect_ratio": aspect,
+            "image_size": "1K",
+        }
+    }).encode()
+
+    url = "https://bratuha.ru/api/v1/operations"
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Authorization", f"Bearer {api_key}")
+    req.add_header("Content-Type", "application/json")
+
     try:
-        print(f"[image] fal.ai FLUX.1: {prompt[:80]}")
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="ignore")
+        print(f"[bratuha] HTTP {e.code}: {err[:500]}")
+        raise Exception(f"Bratuha HTTP {e.code}: {err[:300]}")
+
+    op_id = data.get("id")
+    if not op_id:
+        raise Exception(f"Bratuha: нет id операции — {str(data)[:200]}")
+
+    print(f"[bratuha] операция создана: {op_id}")
+
+    for attempt in range(60):
+        time.sleep(3)
+        status_req = urllib.request.Request(
+            f"https://bratuha.ru/api/v1/operations/{op_id}",
+            method="GET"
+        )
+        status_req.add_header("Authorization", f"Bearer {api_key}")
+        try:
+            with urllib.request.urlopen(status_req, timeout=15) as resp:
+                status_data = json.loads(resp.read())
+        except urllib.error.HTTPError as e:
+            print(f"[bratuha] polling error {e.code}")
+            continue
+
+        status = status_data.get("status")
+        print(f"[bratuha] attempt {attempt+1}: {status}")
+
+        if status == "completed":
+            result = status_data.get("result", {})
+            img_url = None
+            if isinstance(result, dict):
+                images = result.get("images", [])
+                if images:
+                    img_url = images[0] if isinstance(images[0], str) else images[0].get("url")
+                if not img_url:
+                    img_url = result.get("url") or result.get("image_url")
+            elif isinstance(result, str):
+                img_url = result
+            if not img_url:
+                raise Exception(f"Bratuha: нет URL в результате — {str(result)[:200]}")
+            dl_req = urllib.request.Request(img_url, method="GET")
+            with urllib.request.urlopen(dl_req, timeout=60) as resp:
+                return resp.read()
+
+        if status == "failed":
+            raise Exception(f"Bratuha: генерация завершилась ошибкой — {status_data.get('error_message', '')}")
+
+    raise Exception("Bratuha: таймаут ожидания результата")
+
+
+def generate_image_with_fallback(prompt: str, size: str = "square") -> bytes:
+    """Цепочка: Bratuha → fal.ai FLUX.1 → Stability AI SD3.5"""
+    try:
+        print(f"[image] Bratuha nano-banana-2: {prompt[:80]}")
+        return call_bratuha_txt2img(prompt, size)
+    except Exception as e:
+        print(f"[image] Bratuha failed ({e}), fallback → fal.ai")
+    try:
         return call_fal_txt2img(prompt, size)
     except Exception as e:
         print(f"[image] fal.ai failed ({e}), fallback → Stability AI")
