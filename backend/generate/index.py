@@ -64,7 +64,56 @@ SIZE_MAP = {
     "wide":      (1280, 720),
 }
 
+def call_gemini_txt2img(prompt: str, size: str = "square") -> bytes:
+    """Генерация изображения через Google Gemini Imagen 3"""
+    api_key = os.environ.get("GEMINI_API_KEY", "")
+    if not api_key:
+        raise Exception("GEMINI_API_KEY не настроен")
+
+    ASPECT_MAP = {
+        "square":    "1:1",
+        "portrait":  "3:4",
+        "landscape": "4:3",
+        "story":     "9:16",
+        "wide":      "16:9",
+    }
+    aspect = ASPECT_MAP.get(size, "1:1")
+
+    payload = json.dumps({
+        "instances": [{"prompt": prompt}],
+        "parameters": {
+            "sampleCount": 1,
+            "aspectRatio": aspect,
+            "safetyFilterLevel": "block_few",
+            "personGeneration": "allow_adult",
+        }
+    }).encode()
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key={api_key}"
+    req = urllib.request.Request(url, data=payload, method="POST")
+    req.add_header("Content-Type", "application/json")
+
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="ignore")
+        print(f"[gemini imagen] HTTP {e.code}: {err[:500]}")
+        raise Exception(f"Gemini Imagen HTTP {e.code}: {err[:300]}")
+
+    predictions = data.get("predictions", [])
+    if not predictions:
+        raise Exception(f"Gemini Imagen: пустой ответ — {str(data)[:200]}")
+
+    b64_data = predictions[0].get("bytesBase64Encoded", "")
+    if not b64_data:
+        raise Exception(f"Gemini Imagen: нет изображения в ответе")
+
+    return base64.b64decode(b64_data)
+
+
 def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
+    """Резервный генератор через Pollinations (используется если Gemini недоступен)"""
     import urllib.parse
     w, h = SIZE_MAP.get(size, (1024, 1024))
     encoded = urllib.parse.quote(prompt)
@@ -73,6 +122,16 @@ def call_pollinations_txt2img(prompt: str, size: str = "square") -> bytes:
     req.add_header("User-Agent", "Mozilla/5.0")
     with urllib.request.urlopen(req, timeout=120) as resp:
         return resp.read()
+
+
+def generate_image_with_fallback(prompt: str, size: str = "square") -> bytes:
+    """Генерирует изображение: сначала Gemini Imagen 3, при ошибке — Pollinations Flux"""
+    try:
+        print(f"[image] Gemini Imagen 3: {prompt[:80]}")
+        return call_gemini_txt2img(prompt, size)
+    except Exception as e:
+        print(f"[image] Gemini failed ({e}), fallback → Pollinations")
+        return call_pollinations_txt2img(prompt, size)
 
 def resize_image(image_bytes: bytes, max_size: int = 512) -> bytes:
     """Сжимает изображение до max_size по большей стороне через PIL"""
@@ -191,14 +250,9 @@ def gemini_generate_slides(topic: str, slides_count: int, ai_text: bool) -> list
 
 
 def generate_slide_image_pollinations(visual_prompt: str, style_prompt: str) -> bytes:
-    """Генерирует изображение слайда через Pollinations (txt2img)"""
+    """Генерирует изображение слайда через Gemini Imagen 3 (с fallback на Pollinations)"""
     full_prompt = f"{visual_prompt}, {style_prompt}, high quality, instagram post, no text overlay"
-    encoded = urllib.parse.quote(full_prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1080&model=flux&nologo=true&enhance=false"
-    req = urllib.request.Request(url, method="GET")
-    req.add_header("User-Agent", "Mozilla/5.0")
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return resp.read()
+    return generate_image_with_fallback(full_prompt, size="square")
 
 
 def generate_slide_image_with_photo(visual_prompt: str, style_prompt: str, user_image_b64: str) -> bytes:
@@ -310,7 +364,7 @@ def handler(event: dict, context) -> dict:
         full_prompt += ", high quality, 8k, photorealistic"
 
         try:
-            image_bytes = call_pollinations_txt2img(full_prompt, size)
+            image_bytes = generate_image_with_fallback(full_prompt, size)
             cdn_url = upload_image_to_s3(image_bytes, prefix="generated")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "prompt": full_prompt})}
         except Exception as e:
@@ -463,14 +517,9 @@ def handler(event: dict, context) -> dict:
         if not main_text:
             return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Введите текст для Stories"})}
         try:
-            # Генерируем фон через Pollinations в формате 9:16
+            # Генерируем фон через Gemini Imagen 3 (с fallback на Pollinations)
             full_prompt = f"{bg_prompt}, vertical format, instagram story background, no text, no letters, abstract"
-            encoded_prompt = urllib.parse.quote(full_prompt)
-            url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=576&height=1024&model=flux&nologo=true&enhance=false"
-            req_img = urllib.request.Request(url, method="GET")
-            req_img.add_header("User-Agent", "Mozilla/5.0")
-            with urllib.request.urlopen(req_img, timeout=90) as resp:
-                img_bytes = resp.read()
+            img_bytes = generate_image_with_fallback(full_prompt, size="story")
             cdn_url = upload_image_to_s3(img_bytes, prefix="stories")
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"image_url": cdn_url, "main_text": main_text, "sub_text": sub_text})}
         except Exception as e:
