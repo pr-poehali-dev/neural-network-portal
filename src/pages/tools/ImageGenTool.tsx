@@ -3,11 +3,18 @@ import Navbar from "@/components/Navbar";
 import ToolWrapper from "@/components/ToolWrapper";
 import { Button } from "@/components/ui/button";
 import Icon from "@/components/ui/icon";
-import { toolsApi, generateApi } from "@/lib/api";
+import { toolsApi, generateApi, paymentsApi } from "@/lib/api";
 import AuthModal from "@/components/AuthModal";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
+
+const IMAGE_PACKS = [
+  { slug: "img_pack_1",   label: "1 изображение",   price: 20,   images: 1 },
+  { slug: "img_pack_10",  label: "10 изображений",  price: 200,  images: 10 },
+  { slug: "img_pack_50",  label: "50 изображений",  price: 1000, images: 50 },
+  { slug: "img_pack_100", label: "100 изображений", price: 2000, images: 100 },
+];
 
 const STYLE_PRESETS = [
   "Фотореализм", "Аниме", "Акварель", "Масло", "Пиксель арт", "3D рендер", "Минимализм", "Ретро",
@@ -38,29 +45,43 @@ export default function ImageGenTool() {
   const [editResultUrl, setEditResultUrl] = useState<string | null>(null);
 
   const [authOpen, setAuthOpen] = useState(false);
+  const [showPacks, setShowPacks] = useState(false);
+  const [buyingPack, setBuyingPack] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
 
-  const checkLimit = async () => {
+  const checkLimit = async (toolSlug: string) => {
     if (!user) { setAuthOpen(true); return false; }
     try {
-      const limit = await toolsApi.checkLimit("image-gen");
+      const limit = await toolsApi.checkLimit(toolSlug);
       if (!limit.allowed) {
-        toast.error(
-          <div>
-            <p className="font-medium">Лимит исчерпан</p>
-            <Link to="/pricing" className="text-primary text-sm underline">Выбрать тариф →</Link>
-          </div>
-        );
+        setShowPacks(true);
         return false;
       }
     } catch { /* ignore */ }
     return true;
   };
 
+  const buyPack = async (slug: string) => {
+    if (!user) { setAuthOpen(true); return; }
+    setBuyingPack(slug);
+    try {
+      const res = await paymentsApi.create(slug);
+      if (res.confirmation_url) {
+        window.location.href = res.confirmation_url;
+      } else if (res.demo) {
+        toast.error("Оплата не настроена. Обратитесь к администратору.");
+      }
+    } catch {
+      toast.error("Ошибка при создании платежа");
+    } finally {
+      setBuyingPack(null);
+    }
+  };
+
   const generate = async () => {
     if (!prompt.trim()) { toast.error("Введите описание изображения"); return; }
-    if (!await checkLimit()) return;
+    if (!await checkLimit("image-gen")) return;
 
     setLoading(true);
     setResultUrl(null);
@@ -122,7 +143,7 @@ export default function ImageGenTool() {
   const editPhoto = async () => {
     if (!editImageFile) { toast.error("Загрузите фото"); return; }
     if (!editPrompt.trim()) { toast.error("Опишите что изменить"); return; }
-    if (!await checkLimit()) return;
+    if (!await checkLimit("image-edit")) return;
 
     setEditLoading(true);
     setEditResultUrl(null);
@@ -217,10 +238,26 @@ export default function ImageGenTool() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 text-xs text-white/30 bg-primary/5 border border-primary/10 rounded-lg p-3">
-                  <Icon name="Gift" size={14} className="text-primary" />
-                  <span>Первая генерация — бесплатно!</span>
-                </div>
+                {showPacks && (
+                  <div className="space-y-3 border border-primary/20 rounded-xl p-4 bg-primary/5">
+                    <p className="text-sm font-medium text-white">Выберите пакет изображений</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {IMAGE_PACKS.map((pack) => (
+                        <button
+                          key={pack.slug}
+                          onClick={() => buyPack(pack.slug)}
+                          disabled={buyingPack === pack.slug}
+                          className="flex flex-col items-start p-3 rounded-lg bg-white/5 border border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-all text-left"
+                        >
+                          <span className="text-sm font-semibold text-white">{pack.label}</span>
+                          <span className="text-primary text-base font-bold mt-0.5">{pack.price} ₽</span>
+                          {buyingPack === pack.slug && <span className="text-[10px] text-white/40 mt-1">Переход к оплате...</span>}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-white/30">Работает для генерации и редактирования фото</p>
+                  </div>
+                )}
 
                 <Button onClick={generate} disabled={loading} className="w-full bg-primary text-black font-semibold hover:bg-primary/90">
                   {loading ? <><Icon name="Loader2" size={16} className="animate-spin mr-2" />Генерирую... (до 60 сек)</> : <><Icon name="ImagePlus" size={16} className="mr-2" />Создать изображение</>}
@@ -311,6 +348,27 @@ export default function ImageGenTool() {
                     ))}
                   </div>
                 </div>
+
+                {showPacks && (
+                  <div className="space-y-3 border border-primary/20 rounded-xl p-4 bg-primary/5">
+                    <p className="text-sm font-medium text-white">Выберите пакет изображений</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {IMAGE_PACKS.map((pack) => (
+                        <button
+                          key={pack.slug}
+                          onClick={() => buyPack(pack.slug)}
+                          disabled={buyingPack === pack.slug}
+                          className="flex flex-col items-start p-3 rounded-lg bg-white/5 border border-white/10 hover:border-primary/40 hover:bg-primary/10 transition-all text-left"
+                        >
+                          <span className="text-sm font-semibold text-white">{pack.label}</span>
+                          <span className="text-primary text-base font-bold mt-0.5">{pack.price} ₽</span>
+                          {buyingPack === pack.slug && <span className="text-[10px] text-white/40 mt-1">Переход к оплате...</span>}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-white/30">Работает для генерации и редактирования фото</p>
+                  </div>
+                )}
 
                 <Button onClick={editPhoto} disabled={editLoading} className="w-full bg-primary text-black font-semibold hover:bg-primary/90">
                   {editLoading ? <><Icon name="Loader2" size={16} className="animate-spin mr-2" />Редактирую... (до 60 сек)</> : <><Icon name="Wand2" size={16} className="mr-2" />Применить изменения</>}

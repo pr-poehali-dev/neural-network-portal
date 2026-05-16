@@ -78,14 +78,14 @@ def handler(event: dict, context) -> dict:
             return_url = body.get("return_url", "https://neuralai.poehali.dev/pricing?payment=success")
 
             cur.execute(
-                f"SELECT id, name, price, duration_months, description FROM {SCHEMA}.subscription_plans WHERE slug = %s AND is_active = TRUE",
+                f"SELECT id, name, price, duration_months, description, is_credit_pack, credit_images FROM {SCHEMA}.subscription_plans WHERE slug = %s AND is_active = TRUE",
                 (plan_slug,)
             )
             plan = cur.fetchone()
             if not plan:
                 return {"statusCode": 404, "headers": headers, "body": json.dumps({"error": "Тариф не найден"})}
 
-            plan_id, plan_name, amount, duration_months, description = plan
+            plan_id, plan_name, amount, duration_months, description, is_credit_pack, credit_images = plan
 
             # Проверяем наличие ключей ЮКасса
             shop_id = os.environ.get("YOOKASSA_SHOP_ID", "")
@@ -114,7 +114,9 @@ def handler(event: dict, context) -> dict:
                     "plan_slug": plan_slug,
                     "plan_id": str(plan_id),
                     "duration_months": str(duration_months),
-                    "single_tool_slug": single_tool_slug or ""
+                    "single_tool_slug": single_tool_slug or "",
+                    "is_credit_pack": "1" if is_credit_pack else "0",
+                    "credit_images": str(credit_images or 0),
                 },
                 "receipt": {
                     "customer": {"email": user_email},
@@ -179,6 +181,8 @@ def handler(event: dict, context) -> dict:
             plan_id = int(metadata.get("plan_id", 0))
             duration_months = int(metadata.get("duration_months", 1))
             single_tool_slug = metadata.get("single_tool_slug") or None
+            is_credit_pack = metadata.get("is_credit_pack") == "1"
+            credit_images = int(metadata.get("credit_images", 0))
 
             if not user_id or not plan_id:
                 return {"statusCode": 400, "headers": headers, "body": json.dumps({"error": "Нет метаданных"})}
@@ -190,17 +194,23 @@ def handler(event: dict, context) -> dict:
             )
 
             if cur.rowcount == 0:
-                # Уже обработан (idempotency)
                 conn.commit()
                 return {"statusCode": 200, "headers": headers, "body": json.dumps({"ok": True})}
 
-            # Создаём подписку
-            expires_at = datetime.now() + timedelta(days=30 * duration_months)
-            cur.execute(
-                f"""INSERT INTO {SCHEMA}.user_subscriptions (user_id, plan_id, expires_at, single_tool_slug)
-                    VALUES (%s, %s, %s, %s)""",
-                (user_id, plan_id, expires_at, single_tool_slug or None)
-            )
+            if is_credit_pack and credit_images > 0:
+                # Пакет изображений — начисляем credits
+                cur.execute(
+                    f"UPDATE {SCHEMA}.users SET image_credits = image_credits + %s WHERE id = %s",
+                    (credit_images, user_id)
+                )
+            else:
+                # Подписка — создаём запись
+                expires_at = datetime.now() + timedelta(days=30 * duration_months)
+                cur.execute(
+                    f"""INSERT INTO {SCHEMA}.user_subscriptions (user_id, plan_id, expires_at, single_tool_slug)
+                        VALUES (%s, %s, %s, %s)""",
+                    (user_id, plan_id, expires_at, single_tool_slug or None)
+                )
             conn.commit()
 
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"ok": True})}

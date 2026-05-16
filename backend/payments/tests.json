@@ -1,12 +1,10 @@
 {
   "tests": [
     {
-      "name": "Status not found",
-      "method": "GET",
-      "path": "/?action=status&payment_id=nonexistent",
-      "expectedStatus": 404,
-      "expectedBody": {"error": "Платёж не найден"},
-      "bodyMatcher": "partial"
+      "name": "OPTIONS preflight",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
     }
   ]
 }

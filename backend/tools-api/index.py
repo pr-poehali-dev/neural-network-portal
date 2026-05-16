@@ -9,7 +9,7 @@ def get_conn():
 
 def get_user_by_token(cur, token):
     cur.execute(
-        f"SELECT id, email, name, is_admin, bonus_generations, free_image_generations, free_carousel_generations FROM {SCHEMA}.users WHERE password_hash LIKE %s",
+        f"SELECT id, email, name, is_admin, bonus_generations, free_image_generations, free_carousel_generations, image_credits FROM {SCHEMA}.users WHERE password_hash LIKE %s",
         ("%" + token,)
     )
     return cur.fetchone()
@@ -102,8 +102,9 @@ def handler(event: dict, context) -> dict:
             if not user:
                 return {"statusCode": 401, "headers": headers, "body": json.dumps({"error": "Сессия истекла"})}
 
-            user_id, _, _, is_admin, bonus, free_img, free_car = user
+            user_id, _, _, is_admin, bonus, free_img, free_car, image_credits = user
             tool_slug = body.get("tool_slug", "")
+            is_image_tool = tool_slug in ("image-gen", "image-edit")
 
             if is_admin:
                 return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": True, "reason": "admin"})}
@@ -113,23 +114,19 @@ def handler(event: dict, context) -> dict:
                 slug, is_unlimited, gen_per_tool, is_single_tool, single_slug, expires_at, granted_by_admin = sub
                 if is_unlimited:
                     if is_single_tool and single_slug and single_slug != tool_slug:
-                        return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": False, "reason": "wrong_tool"})}
+                        pass
                     else:
                         return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": True, "reason": "subscription_unlimited"})}
                 else:
-                    if is_single_tool and single_slug and single_slug != tool_slug:
-                        return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": False, "reason": "wrong_tool"})}
-                    else:
+                    if not (is_single_tool and single_slug and single_slug != tool_slug):
                         used = count_generations(cur, user_id, tool_slug)
                         if used < gen_per_tool:
                             return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": True, "remaining": gen_per_tool - used, "reason": "subscription"})}
 
-            if tool_slug == "image-gen" and free_img > 0:
-                return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": True, "remaining": free_img, "reason": "free_trial"})}
-            if tool_slug == "carousel" and free_car > 0:
-                return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": True, "remaining": free_car, "reason": "free_trial"})}
+            if is_image_tool and image_credits > 0:
+                return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": True, "remaining": image_credits, "reason": "credits"})}
 
-            if bonus > 0 and tool_slug == "image-gen":
+            if is_image_tool and bonus > 0:
                 return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": True, "remaining": bonus, "reason": "bonus"})}
 
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"allowed": False, "reason": "limit_exceeded"})}
@@ -144,12 +141,13 @@ def handler(event: dict, context) -> dict:
 
             user_id = user[0]
             is_admin = user[3]
-            free_img = user[5]
-            free_car = user[6]
+            bonus = user[4]
+            image_credits = user[7]
             tool_slug = body.get("tool_slug", "")
             prompt = body.get("prompt", "")
             result_url = body.get("result_url", "")
             result_data = body.get("result_data", {})
+            is_image_tool = tool_slug in ("image-gen", "image-edit")
 
             cur.execute(
                 f"INSERT INTO {SCHEMA}.tool_generations (user_id, tool_slug, prompt, result_url, result_data) VALUES (%s, %s, %s, %s, %s) RETURNING id",
@@ -157,11 +155,11 @@ def handler(event: dict, context) -> dict:
             )
             gen_id = cur.fetchone()[0]
 
-            if not is_admin:
-                if tool_slug == "image-gen" and free_img > 0:
-                    cur.execute(f"UPDATE {SCHEMA}.users SET free_image_generations = free_image_generations - 1 WHERE id = %s", (user_id,))
-                elif tool_slug == "carousel" and free_car > 0:
-                    cur.execute(f"UPDATE {SCHEMA}.users SET free_carousel_generations = free_carousel_generations - 1 WHERE id = %s", (user_id,))
+            if not is_admin and is_image_tool:
+                if image_credits > 0:
+                    cur.execute(f"UPDATE {SCHEMA}.users SET image_credits = image_credits - 1 WHERE id = %s", (user_id,))
+                elif bonus > 0:
+                    cur.execute(f"UPDATE {SCHEMA}.users SET bonus_generations = bonus_generations - 1 WHERE id = %s", (user_id,))
 
             conn.commit()
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"success": True, "generation_id": gen_id})}
