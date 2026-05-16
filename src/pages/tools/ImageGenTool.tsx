@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Navbar from "@/components/Navbar";
 import ToolWrapper from "@/components/ToolWrapper";
 import { Button } from "@/components/ui/button";
@@ -47,14 +47,25 @@ export default function ImageGenTool() {
   const [authOpen, setAuthOpen] = useState(false);
   const [showPacks, setShowPacks] = useState(false);
   const [buyingPack, setBuyingPack] = useState<string | null>(null);
+  const [credits, setCredits] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    toolsApi.checkLimit("image-gen").then((res) => {
+      if (res.allowed && typeof res.remaining === "number") setCredits(res.remaining);
+      else if (!res.allowed) setCredits(0);
+    }).catch(() => {});
+  }, [user]);
 
   const checkLimit = async (toolSlug: string) => {
     if (!user) { setAuthOpen(true); return false; }
     try {
       const limit = await toolsApi.checkLimit(toolSlug);
+      if (typeof limit.remaining === "number") setCredits(limit.remaining);
       if (!limit.allowed) {
+        setCredits(0);
         setShowPacks(true);
         return false;
       }
@@ -95,6 +106,7 @@ export default function ImageGenTool() {
         if (poll.status === "completed" && poll.image_url) {
           setResultUrl(poll.image_url);
           await toolsApi.saveGeneration("image-gen", fullPrompt, poll.image_url);
+          setCredits((c) => (c !== null && c > 0 ? c - 1 : c));
           toast.success("Изображение создано!");
           return;
         }
@@ -157,6 +169,7 @@ export default function ImageGenTool() {
         if (poll.status === "completed" && poll.image_url) {
           setEditResultUrl(poll.image_url);
           await toolsApi.saveGeneration("image-edit", fullPrompt, poll.image_url);
+          setCredits((c) => (c !== null && c > 0 ? c - 1 : c));
           toast.success("Фото отредактировано!");
           return;
         }
@@ -192,6 +205,18 @@ export default function ImageGenTool() {
                 Редактирование фото
               </button>
             </div>
+
+            {user && credits !== null && (
+              <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm ${credits === 0 ? "bg-red-500/10 border-red-500/20" : "bg-white/5 border-white/10"}`}>
+                <div className="flex items-center gap-2 text-white/60">
+                  <Icon name="ImageIcon" size={15} />
+                  <span>Баланс изображений</span>
+                </div>
+                <span className={`font-bold tabular-nums ${credits === 0 ? "text-red-400" : "text-primary"}`}>
+                  {credits} шт.
+                </span>
+              </div>
+            )}
 
             {tab === "generate" && (
               <div className="glass rounded-xl p-6 border border-white/5 space-y-4">
