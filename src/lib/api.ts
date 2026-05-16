@@ -384,6 +384,7 @@ export interface User {
   bonus_generations: number;
   free_image_generations: number;
   free_carousel_generations: number;
+  image_credits?: number;
   subscription?: Subscription | null;
 }
 

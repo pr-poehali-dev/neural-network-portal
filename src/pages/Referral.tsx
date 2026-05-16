@@ -36,7 +36,7 @@ export default function Referral() {
         <div className="glass rounded-xl border border-primary/20 p-6 mb-6 bg-primary/5">
           <div className="text-center mb-6">
             <p className="text-5xl font-display font-bold neon-text mb-2">+1</p>
-            <p className="text-white/60">бесплатная генерация изображения</p>
+            <p className="text-white/60">бонусная генерация изображения</p>
             <p className="text-sm text-white/30 mt-1">за каждого приглашённого друга</p>
           </div>
 
@@ -44,7 +44,7 @@ export default function Referral() {
             {[
               { step: "1", text: "Поделись своей ссылкой с друзьями" },
               { step: "2", text: "Друг регистрируется по твоей ссылке" },
-              { step: "3", text: "Ты получаешь +1 бесплатную генерацию фото" },
+              { step: "3", text: "Ты получаешь +1 бонусную генерацию фото" },
             ].map((item) => (
               <div key={item.step} className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">

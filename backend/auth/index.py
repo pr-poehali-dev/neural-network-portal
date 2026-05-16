@@ -110,14 +110,14 @@ def handler(event: dict, context) -> dict:
             pw_hash = hash_password(password)
 
             cur.execute(
-                f"SELECT id, email, name, referral_code, is_admin, bonus_generations, free_image_generations, free_carousel_generations FROM {SCHEMA}.users WHERE email = %s AND password_hash LIKE %s",
+                f"SELECT id, email, name, referral_code, is_admin, bonus_generations, free_image_generations, free_carousel_generations, image_credits FROM {SCHEMA}.users WHERE email = %s AND password_hash LIKE %s",
                 (email, pw_hash + "%")
             )
             row = cur.fetchone()
             if not row:
                 return {"statusCode": 401, "headers": headers, "body": json.dumps({"error": "Неверный email или пароль"})}
 
-            user_id, user_email, user_name, ref_code, is_admin, bonus, free_img, free_car = row
+            user_id, user_email, user_name, ref_code, is_admin, bonus, free_img, free_car, image_credits = row
             token = generate_token(user_id)
             cur.execute(
                 f"UPDATE {SCHEMA}.users SET password_hash = %s WHERE id = %s",
@@ -152,7 +152,8 @@ def handler(event: dict, context) -> dict:
                         "id": user_id, "email": user_email, "name": user_name,
                         "referral_code": ref_code, "is_admin": is_admin,
                         "bonus_generations": bonus, "free_image_generations": free_img,
-                        "free_carousel_generations": free_car, "subscription": subscription
+                        "free_carousel_generations": free_car, "image_credits": image_credits,
+                        "subscription": subscription
                     },
                     "token": token
                 })
@@ -165,14 +166,14 @@ def handler(event: dict, context) -> dict:
                 return {"statusCode": 401, "headers": headers, "body": json.dumps({"error": "Не авторизован"})}
 
             cur.execute(
-                f"SELECT id, email, name, referral_code, is_admin, bonus_generations, free_image_generations, free_carousel_generations FROM {SCHEMA}.users WHERE password_hash LIKE %s",
+                f"SELECT id, email, name, referral_code, is_admin, bonus_generations, free_image_generations, free_carousel_generations, image_credits FROM {SCHEMA}.users WHERE password_hash LIKE %s",
                 ("%" + token,)
             )
             row = cur.fetchone()
             if not row:
                 return {"statusCode": 401, "headers": headers, "body": json.dumps({"error": "Сессия истекла"})}
 
-            user_id, user_email, user_name, ref_code, is_admin, bonus, free_img, free_car = row
+            user_id, user_email, user_name, ref_code, is_admin, bonus, free_img, free_car, image_credits = row
 
             cur.execute(
                 f"""SELECT sp.name, sp.slug, us.expires_at, us.single_tool_slug, sp.is_unlimited, sp.generations_per_tool
@@ -200,7 +201,8 @@ def handler(event: dict, context) -> dict:
                         "id": user_id, "email": user_email, "name": user_name,
                         "referral_code": ref_code, "is_admin": is_admin,
                         "bonus_generations": bonus, "free_image_generations": free_img,
-                        "free_carousel_generations": free_car, "subscription": subscription
+                        "free_carousel_generations": free_car, "image_credits": image_credits,
+                        "subscription": subscription
                     }
                 })
             }

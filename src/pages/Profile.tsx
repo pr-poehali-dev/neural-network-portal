@@ -107,14 +107,10 @@ export default function Profile() {
         </div>
 
         {/* Счётчики */}
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 gap-4">
           <div className="glass rounded-xl border border-white/5 p-4 text-center">
-            <p className="text-2xl font-display font-bold text-primary">{user!.free_image_generations}</p>
-            <p className="text-xs text-white/40 mt-1">Бесплатных генераций изображений</p>
-          </div>
-          <div className="glass rounded-xl border border-white/5 p-4 text-center">
-            <p className="text-2xl font-display font-bold text-primary">{user!.free_carousel_generations}</p>
-            <p className="text-xs text-white/40 mt-1">Бесплатных каруселей</p>
+            <p className="text-2xl font-display font-bold text-primary">{user!.image_credits ?? 0}</p>
+            <p className="text-xs text-white/40 mt-1">Изображений на балансе</p>
           </div>
           <div className="glass rounded-xl border border-white/5 p-4 text-center">
             <p className="text-2xl font-display font-bold text-primary">{user!.bonus_generations}</p>

@@ -10,7 +10,6 @@ const TOOLS = [
     desc: "Создай изображение по промту или измени стиль своего фото",
     href: "/tools/image-gen",
     color: "from-violet-500/20 to-purple-500/20 border-violet-500/20",
-    free: true,
     hint: "Начни с описания того, что хочешь увидеть",
   },
   {
@@ -19,7 +18,6 @@ const TOOLS = [
     desc: "Создай структуру карусели для Instagram с текстом слайдов",
     href: "/tools/carousel",
     color: "from-pink-500/20 to-rose-500/20 border-pink-500/20",
-    free: true,
     hint: "Укажи тему — получи готовую структуру",
   },
   {
@@ -133,7 +131,6 @@ const TOOLS = [
     desc: "Загрузи фото — получи аватары в 12 стилях: арт, аниме, 3D, киберпанк",
     href: "/tools/avatar",
     color: "from-violet-500/20 to-fuchsia-500/20 border-violet-500/20",
-    free: true,
     hint: "Загрузи фото и выбери стили",
   },
   {

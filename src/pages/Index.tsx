@@ -7,8 +7,8 @@ import AuthModal from "@/components/AuthModal";
 import { useAuth } from "@/hooks/useAuth";
 
 const TOOLS = [
-  { icon: "ImagePlus",     label: "Генерация изображений",  desc: "По промту или редактирование фото с ИИ", href: "/tools/image-gen",   color: "from-violet-500/20 to-purple-500/20", free: true },
-  { icon: "LayoutTemplate",label: "Пост-карусель",          desc: "Слайды с текстом и картинками для Instagram", href: "/tools/carousel",    color: "from-pink-500/20 to-rose-500/20",   free: true },
+  { icon: "ImagePlus",     label: "Генерация изображений",  desc: "По промту или редактирование фото с ИИ", href: "/tools/image-gen",   color: "from-violet-500/20 to-purple-500/20" },
+  { icon: "LayoutTemplate",label: "Пост-карусель",          desc: "Слайды с текстом и картинками для Instagram", href: "/tools/carousel",    color: "from-pink-500/20 to-rose-500/20" },
   { icon: "Wand2",         label: "Генерация постов",       desc: "Посты с выбором длины, языка и стиля эмодзи", href: "/tools/post",        color: "from-green-500/20 to-teal-500/20" },
   { icon: "CalendarDays",  label: "Контент-план",           desc: "Excel-таблица с планом, аналитикой и советами", href: "/tools/content-plan",color: "from-teal-500/20 to-cyan-500/20" },
   { icon: "Hash",          label: "Хэштег-анализатор",     desc: "30 хэштегов по частотности для любой ниши", href: "/tools/hashtags",    color: "from-sky-500/20 to-blue-500/20",    free: true },
@@ -107,7 +107,7 @@ export default function Index() {
                 onClick={() => setAuthOpen(true)}
                 className="bg-primary text-black font-semibold text-base px-8 hover:bg-primary/90 h-12"
               >
-                Начать бесплатно
+                Начать
                 <Icon name="Sparkles" size={18} className="ml-2" />
               </Button>
             )}
@@ -118,9 +118,7 @@ export default function Index() {
             </Link>
           </div>
 
-          <p className="text-sm text-white/30 mt-4 animate-fade-in stagger-4">
-            1 бесплатная генерация изображений + 1 пост-карусель без регистрации кредитной карты
-          </p>
+
         </div>
       </section>
 
