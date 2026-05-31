@@ -114,17 +114,18 @@ export default function Admin() {
         </div>
 
         {tab === "stats" && stats && (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
-              { label: "Пользователей", value: stats.total_users, icon: "Users" },
-              { label: "Активных подписок", value: stats.active_subscriptions, icon: "Crown" },
-              { label: "Всего генераций", value: stats.total_generations, icon: "Sparkles" },
-              { label: "Рефералов", value: stats.total_referrals, icon: "Share2" },
-              { label: "Новых за неделю", value: stats.new_users_week, icon: "TrendingUp" },
+              { label: "Пользователей", value: stats.total_users, icon: "Users", suffix: "" },
+              { label: "Активных подписок", value: stats.active_subscriptions, icon: "Crown", suffix: "" },
+              { label: "Всего генераций", value: stats.total_generations, icon: "Sparkles", suffix: "" },
+              { label: "Рефералов", value: stats.total_referrals, icon: "Share2", suffix: "" },
+              { label: "Новых за неделю", value: stats.new_users_week, icon: "TrendingUp", suffix: "" },
+              { label: "Выручка", value: (stats.total_revenue ?? 0).toLocaleString("ru-RU"), icon: "Banknote", suffix: " ₽" },
             ].map((s) => (
               <div key={s.label} className="glass rounded-xl border border-white/5 p-5 text-center">
                 <Icon name={s.icon} size={20} className="text-primary mx-auto mb-2" />
-                <p className="text-2xl font-display font-bold text-white">{s.value}</p>
+                <p className="text-2xl font-display font-bold text-white">{s.value}{s.suffix}</p>
                 <p className="text-xs text-white/40 mt-1">{s.label}</p>
               </div>
             ))}
@@ -172,6 +173,9 @@ export default function Admin() {
                       <th className="text-left px-4 py-3">ID</th>
                       <th className="text-left px-4 py-3">Email / Имя</th>
                       <th className="text-left px-4 py-3">Подписка</th>
+                      <th className="text-right px-4 py-3">Фото</th>
+                      <th className="text-right px-4 py-3">Баланс</th>
+                      <th className="text-right px-4 py-3">Оплачено</th>
                       <th className="text-left px-4 py-3">Роль</th>
                       <th className="text-left px-4 py-3">Дата</th>
                       <th className="text-left px-4 py-3">Действия</th>
@@ -179,7 +183,7 @@ export default function Admin() {
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {users.map((u) => (
-                      <tr key={u.id} className="hover:bg-white/2">
+                      <tr key={u.id} className="hover:bg-white/[0.02]">
                         <td className="px-4 py-3 text-white/30">{u.id}</td>
                         <td className="px-4 py-3">
                           <p className="text-white/80">{u.email}</p>
@@ -190,6 +194,21 @@ export default function Admin() {
                             <span className="tag-pill bg-primary/15 text-primary px-2 py-0.5 rounded text-[10px]">{u.subscription}</span>
                           ) : (
                             <span className="text-white/20 text-xs">Нет</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right text-white/60 text-sm tabular-nums">
+                          {u.img_gens ?? 0}
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          <span className={`text-sm font-medium ${(u.image_credits ?? 0) > 0 ? "text-primary" : "text-white/20"}`}>
+                            {u.image_credits ?? 0} шт.
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right tabular-nums">
+                          {(u.total_paid ?? 0) > 0 ? (
+                            <span className="text-green-400 text-sm font-semibold">{(u.total_paid ?? 0).toLocaleString("ru-RU")} ₽</span>
+                          ) : (
+                            <span className="text-white/20 text-xs">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3">

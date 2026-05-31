@@ -60,39 +60,52 @@ def handler(event: dict, context) -> dict:
             total_refs = cur.fetchone()[0]
             cur.execute(f"SELECT COUNT(*) FROM {SCHEMA}.users WHERE created_at > NOW() - INTERVAL '7 days'")
             new_users_week = cur.fetchone()[0]
+            cur.execute(f"SELECT COALESCE(SUM(amount), 0) FROM {SCHEMA}.payments WHERE status = 'paid'")
+            total_revenue = cur.fetchone()[0]
 
             return {"statusCode": 200, "headers": headers, "body": json.dumps({
                 "total_users": total_users, "active_subscriptions": active_subs,
                 "total_generations": total_gens, "total_referrals": total_refs,
-                "new_users_week": new_users_week
+                "new_users_week": new_users_week, "total_revenue": total_revenue
             })}
 
         elif method == "GET" and action == "users":
             search = query.get("search", "")
-            sql = f"SELECT id, email, name, is_admin, bonus_generations, free_image_generations, free_carousel_generations, created_at FROM {SCHEMA}.users WHERE 1=1"
+            where = "WHERE 1=1"
             params = []
             if search:
-                sql += " AND (email ILIKE %s OR name ILIKE %s)"
+                where += " AND (u.email ILIKE %s OR u.name ILIKE %s)"
                 params.extend([f"%{search}%", f"%{search}%"])
-            sql += " ORDER BY created_at DESC LIMIT 100"
+
+            sql = f"""
+                SELECT
+                    u.id, u.email, u.name, u.is_admin,
+                    u.image_credits, u.bonus_generations, u.created_at,
+                    (SELECT sp.name FROM {SCHEMA}.user_subscriptions us
+                        JOIN {SCHEMA}.subscription_plans sp ON sp.id = us.plan_id
+                        WHERE us.user_id = u.id AND us.is_active = TRUE
+                          AND (us.expires_at IS NULL OR us.expires_at > NOW())
+                        ORDER BY us.started_at DESC LIMIT 1) AS subscription,
+                    (SELECT COUNT(*) FROM {SCHEMA}.tool_generations tg
+                        WHERE tg.user_id = u.id AND tg.tool_slug IN ('image-gen', 'image-edit')) AS img_gens,
+                    (SELECT COALESCE(SUM(p.amount), 0) FROM {SCHEMA}.payments p
+                        WHERE p.user_id = u.id AND p.status = 'paid') AS total_paid,
+                    (SELECT COUNT(*) FROM {SCHEMA}.payments p
+                        WHERE p.user_id = u.id AND p.status = 'paid') AS paid_count
+                FROM {SCHEMA}.users u
+                {where}
+                ORDER BY u.created_at DESC LIMIT 100
+            """
             cur.execute(sql, params)
             rows = cur.fetchall()
             users = []
             for r in rows:
-                cur.execute(
-                    f"""SELECT sp.name FROM {SCHEMA}.user_subscriptions us
-                        JOIN {SCHEMA}.subscription_plans sp ON sp.id = us.plan_id
-                        WHERE us.user_id = %s AND us.is_active = TRUE AND (us.expires_at IS NULL OR us.expires_at > NOW())
-                        ORDER BY us.started_at DESC LIMIT 1""",
-                    (r[0],)
-                )
-                sub = cur.fetchone()
                 users.append({
                     "id": r[0], "email": r[1], "name": r[2], "is_admin": r[3],
-                    "bonus_generations": r[4], "free_image_generations": r[5],
-                    "free_carousel_generations": r[6],
-                    "created_at": r[7].isoformat() if r[7] else None,
-                    "subscription": sub[0] if sub else None
+                    "image_credits": r[4] or 0, "bonus_generations": r[5],
+                    "created_at": r[6].isoformat() if r[6] else None,
+                    "subscription": r[7],
+                    "img_gens": r[8], "total_paid": r[9], "paid_count": r[10]
                 })
             return {"statusCode": 200, "headers": headers, "body": json.dumps({"users": users})}
 

@@ -457,6 +457,7 @@ export interface AdminStats {
   total_generations: number;
   total_referrals: number;
   new_users_week: number;
+  total_revenue?: number;
 }
 
 export interface PaymentRecord {
@@ -474,10 +475,12 @@ export interface AdminUser {
   name: string;
   is_admin: boolean;
   bonus_generations: number;
-  free_image_generations: number;
-  free_carousel_generations: number;
+  image_credits: number;
   created_at: string;
   subscription: string | null;
+  img_gens: number;
+  total_paid: number;
+  paid_count: number;
 }
 
 export interface HashtagResult {
