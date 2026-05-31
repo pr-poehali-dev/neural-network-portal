@@ -314,7 +314,7 @@ export const generateApi = {
 };
 
 export const paymentsApi = {
-  create: (plan_slug: string, single_tool_slug?: string) =>
+  create: (plan_slug: string, single_tool_slug?: string, return_url?: string) =>
     request<{ payment_id?: string; confirmation_url?: string; amount: number; plan_name: string; demo?: boolean; message?: string }>(
       PAYMENTS_URL,
       {
@@ -324,7 +324,7 @@ export const paymentsApi = {
           action: "create",
           plan_slug,
           single_tool_slug,
-          return_url: `${window.location.origin}/pricing?payment=success`,
+          return_url: return_url ?? `${window.location.origin}/pricing?payment=success`,
         }),
       }
     ),

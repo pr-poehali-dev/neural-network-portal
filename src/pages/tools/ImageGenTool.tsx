@@ -6,7 +6,7 @@ import Icon from "@/components/ui/icon";
 import { toolsApi, generateApi, paymentsApi } from "@/lib/api";
 import AuthModal from "@/components/AuthModal";
 import { useAuth } from "@/hooks/useAuth";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 
 const IMAGE_PACKS = [
@@ -48,8 +48,11 @@ export default function ImageGenTool() {
   const [showPacks, setShowPacks] = useState(false);
   const [buyingPack, setBuyingPack] = useState<string | null>(null);
   const [credits, setCredits] = useState<number | null>(null);
+  const [polling, setPolling] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { user } = useAuth();
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const { user, refreshUser } = useAuth();
+  const location = useLocation();
 
   useEffect(() => {
     if (!user) return;
@@ -58,6 +61,46 @@ export default function ImageGenTool() {
       else if (!res.allowed) setCredits(0);
     }).catch(() => {});
   }, [user]);
+
+  // Polling после возврата с оплаты
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("payment") !== "success") return;
+
+    const paymentId = localStorage.getItem("pending_payment_id");
+    if (!paymentId) { refreshUser(); return; }
+
+    localStorage.removeItem("pending_payment_id");
+    setPolling(true);
+    setShowPacks(false);
+    toast.info("Проверяем оплату...", { id: "payment-poll", duration: 60000 });
+
+    let attempts = 0;
+    pollRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await paymentsApi.status(paymentId);
+        if (res.status === "paid") {
+          clearInterval(pollRef.current!);
+          setPolling(false);
+          await refreshUser();
+          const limit = await toolsApi.checkLimit("image-gen");
+          if (typeof limit.remaining === "number") setCredits(limit.remaining);
+          toast.dismiss("payment-poll");
+          toast.success("Оплата подтверждена! Баланс пополнен.", { duration: 6000 });
+        } else if (attempts >= 20) {
+          clearInterval(pollRef.current!);
+          setPolling(false);
+          toast.dismiss("payment-poll");
+          toast.warning("Платёж обрабатывается. Обнови страницу через минуту.", { duration: 8000 });
+        }
+      } catch {
+        if (attempts >= 20) { clearInterval(pollRef.current!); setPolling(false); toast.dismiss("payment-poll"); }
+      }
+    }, 3000);
+
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [location.search]);
 
   const checkLimit = async (toolSlug: string) => {
     if (!user) { setAuthOpen(true); return false; }
@@ -77,8 +120,10 @@ export default function ImageGenTool() {
     if (!user) { setAuthOpen(true); return; }
     setBuyingPack(slug);
     try {
-      const res = await paymentsApi.create(slug);
+      const returnUrl = `${window.location.origin}/tools/image-gen?payment=success`;
+      const res = await paymentsApi.create(slug, undefined, returnUrl);
       if (res.confirmation_url) {
+        if (res.payment_id) localStorage.setItem("pending_payment_id", res.payment_id);
         window.location.href = res.confirmation_url;
       } else if (res.demo) {
         toast.error("Оплата не настроена. Обратитесь к администратору.");
@@ -205,6 +250,16 @@ export default function ImageGenTool() {
                 Редактирование фото
               </button>
             </div>
+
+            {polling && (
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-primary/30 bg-primary/5 text-sm">
+                <Icon name="Loader2" size={16} className="text-primary animate-spin flex-shrink-0" />
+                <div>
+                  <p className="text-white font-medium">Ожидаем подтверждение от банка...</p>
+                  <p className="text-white/40 text-xs mt-0.5">Не закрывай страницу — баланс обновится автоматически</p>
+                </div>
+              </div>
+            )}
 
             {user && credits !== null && (
               <div className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-sm ${credits === 0 ? "bg-red-500/10 border-red-500/20" : "bg-white/5 border-white/10"}`}>
