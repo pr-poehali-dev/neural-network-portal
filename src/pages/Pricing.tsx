@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { Button } from "@/components/ui/button";
@@ -155,6 +155,8 @@ export default function Pricing() {
   const [paying, setPaying] = useState<string | null>(null);
   const [selectedTool, setSelectedTool] = useState<string>("");
   const [toolSelectFor, setToolSelectFor] = useState<string | null>(null);
+  const [polling, setPolling] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const { user, refreshUser } = useAuth();
   const location = useLocation();
 
@@ -162,13 +164,51 @@ export default function Pricing() {
     toolsApi.getPlans().then((d) => setPlans(d.plans)).finally(() => setLoading(false));
   }, []);
 
-  // Показываем успех после редиректа от ЮКассы
+  // Polling после редиректа от ЮКассы
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get("payment") === "success") {
-      toast.success("Оплата прошла! Подписка активирована.", { duration: 6000 });
-      if (user) refreshUser();
+    if (params.get("payment") !== "success") return;
+
+    const paymentId = localStorage.getItem("pending_payment_id");
+    if (!paymentId) {
+      toast.success("Оплата прошла! Обновляем данные...", { duration: 5000 });
+      refreshUser();
+      return;
     }
+
+    localStorage.removeItem("pending_payment_id");
+    setPolling(true);
+    toast.info("Проверяем статус оплаты...", { id: "payment-poll", duration: 60000 });
+
+    let attempts = 0;
+    const maxAttempts = 20;
+
+    pollRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const res = await paymentsApi.status(paymentId);
+        if (res.status === "paid") {
+          clearInterval(pollRef.current!);
+          setPolling(false);
+          await refreshUser();
+          toast.dismiss("payment-poll");
+          toast.success("Оплата подтверждена! Баланс пополнен.", { duration: 6000 });
+        } else if (attempts >= maxAttempts) {
+          clearInterval(pollRef.current!);
+          setPolling(false);
+          toast.dismiss("payment-poll");
+          toast.warning("Платёж обрабатывается. Обнови страницу через минуту.", { duration: 8000 });
+        }
+      } catch {
+        if (attempts >= maxAttempts) {
+          clearInterval(pollRef.current!);
+          setPolling(false);
+          toast.dismiss("payment-poll");
+        }
+      }
+    }, 3000);
+
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [location.search]);
 
   const getPlan = (slug: string) => plans.find((p) => p.slug === slug);
@@ -202,6 +242,9 @@ export default function Pricing() {
       }
 
       if (result.confirmation_url) {
+        if (result.payment_id) {
+          localStorage.setItem("pending_payment_id", result.payment_id);
+        }
         window.location.href = result.confirmation_url;
       }
     } catch (e: unknown) {
@@ -217,6 +260,16 @@ export default function Pricing() {
     <div className="min-h-screen bg-background noise-bg">
       <Navbar />
       <div className="pt-24 pb-20 px-4 max-w-7xl mx-auto">
+
+        {polling && (
+          <div className="glass rounded-xl border border-primary/30 bg-primary/5 p-4 mb-6 flex items-center gap-3">
+            <Icon name="Loader2" size={18} className="text-primary animate-spin flex-shrink-0" />
+            <div>
+              <p className="text-white font-medium text-sm">Ожидаем подтверждение от банка...</p>
+              <p className="text-white/40 text-xs mt-0.5">Обычно занимает 5–30 секунд. Не закрывай страницу.</p>
+            </div>
+          </div>
+        )}
 
         {/* Header */}
         <div className="text-center mb-14">
