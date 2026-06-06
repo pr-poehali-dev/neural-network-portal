@@ -11,7 +11,8 @@ export default function RouletteTool() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const spin = async () => {
+  const spin = async (onGenerate: () => Promise<boolean>) => {
+    if (!await onGenerate()) return;
     setLoading(true);
     try {
       const data = await generateApi.roulette();
@@ -34,7 +35,7 @@ export default function RouletteTool() {
     <div className="min-h-screen bg-background noise-bg">
       <Navbar />
       <ToolWrapper toolSlug="roulette" title="Фото-рулетка" description="Случайные промты для реалистичных фото" icon="Shuffle">
-        {() => (
+        {(onGenerate) => (
           <div className="space-y-6">
             <div className="glass rounded-xl border border-white/5 overflow-hidden">
               <div className="p-8 text-center">
@@ -51,7 +52,7 @@ export default function RouletteTool() {
                         <Icon name={copied ? "Check" : "Copy"} size={14} className="mr-1" />
                         {copied ? "Скопировано" : "Скопировать"}
                       </Button>
-                      <Button onClick={spin} size="sm" className="bg-primary text-black hover:bg-primary/90">
+                      <Button onClick={() => spin(onGenerate)} size="sm" className="bg-primary text-black hover:bg-primary/90">
                         <Icon name="Shuffle" size={14} className="mr-1" />
                         Ещё идея
                       </Button>
@@ -60,7 +61,7 @@ export default function RouletteTool() {
                 ) : (
                   <div className="space-y-4">
                     <p className="text-white/40 text-sm">Нажми кнопку и получи идею для крутого фото</p>
-                    <Button onClick={spin} disabled={loading}
+                    <Button onClick={() => spin(onGenerate)} disabled={loading}
                       className="bg-primary text-black font-semibold hover:bg-primary/90 px-8">
                       {loading ? "Выбираю..." : "Крутить рулетку"}
                     </Button>

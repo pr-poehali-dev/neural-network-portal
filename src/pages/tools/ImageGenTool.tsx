@@ -95,7 +95,7 @@ export default function ImageGenTool() {
         return false;
       }
     } catch { /* ignore */ }
-    return true;
+    return false;
   };
 
   const buyPack = async (slug: string) => {

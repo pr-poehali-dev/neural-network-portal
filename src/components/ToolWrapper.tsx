@@ -40,7 +40,7 @@ export default function ToolWrapper({ toolSlug, title, description, icon, childr
       }
       return true;
     } catch {
-      return true;
+      return false;
     }
   };
 
